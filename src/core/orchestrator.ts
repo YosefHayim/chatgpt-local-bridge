@@ -1,7 +1,7 @@
 import type { BridgeConfig, Message, ToolResult } from "../types/types.ts";
 
 /** Events emitted by the orchestrator that the CLI subscribes to. */
-export type OrchestratorEvent =
+type OrchestratorEvent =
   | { type: "message"; message: Message }
   | { type: "tool_call"; name: string; arguments: Record<string, unknown> }
   | { type: "tool_result"; name: string; result: ToolResult }
@@ -10,7 +10,7 @@ export type OrchestratorEvent =
   | { type: "context_update"; count: number; limit: number }
   | { type: "conversation_synced"; messages: Message[] };
 
-export type OrchestratorListener = (event: OrchestratorEvent) => void;
+type OrchestratorListener = (event: OrchestratorEvent) => void;
 
 /**
  * Main loop coordinator.

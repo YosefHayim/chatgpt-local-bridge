@@ -11,13 +11,3 @@ export const toolRegistry: Map<string, ToolDef> = new Map();
 for (const tool of [grepTool, readFileDef, applyPatchTool, runTestsTool, gitDiffTool]) {
   toolRegistry.set(tool.name, tool);
 }
-
-/** Get a tool by name, or undefined if not registered. */
-export function getTool(name: string): ToolDef | undefined {
-  return toolRegistry.get(name);
-}
-
-/** List all registered tool names. */
-export function listToolNames(): string[] {
-  return [...toolRegistry.keys()];
-}

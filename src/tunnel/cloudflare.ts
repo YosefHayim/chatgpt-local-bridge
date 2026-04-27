@@ -1,5 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
 
+/** Cloudflare account for Yosefisabag@gmail.com. */
+const CF_ACCOUNT = "b0ba5fea46c96d72bfc6f12e1dafaf7b";
+
 /** Manages a Cloudflare Tunnel (cloudflared) that exposes a local port over HTTPS. */
 export class CloudflareTunnel {
   private proc: ChildProcess | null = null;
@@ -8,7 +11,13 @@ export class CloudflareTunnel {
   /** Start the tunnel, returning the public HTTPS URL. */
   async start(localPort: number): Promise<string> {
     return new Promise((resolve, reject) => {
-      this.proc = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${localPort}`], {
+      this.proc = spawn("cloudflared", [
+        "tunnel",
+        "--url",
+        `http://localhost:${localPort}`,
+        "--account-tag",
+        CF_ACCOUNT,
+      ], {
         stdio: ["ignore", "pipe", "pipe"],
       });
 

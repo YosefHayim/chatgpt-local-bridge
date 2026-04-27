@@ -5,7 +5,7 @@ const FILE_MENTION_RE = /@([\w./_-]+(?:\.[\w]+))/g;
 const MAX_FILE_BYTES = 100_000;
 
 /** Result of resolving a single @file mention. */
-export interface ResolvedFile {
+interface ResolvedFile {
   /** Repo-relative path */
   relPath: string;
   content: string;

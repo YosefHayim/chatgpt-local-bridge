@@ -15,3 +15,7 @@ opencode.json
 .kilo/
 kilo.jsonc
 .clinerules/
+DEDUP-REPORT.md
+DEDUP-REPORT.json
+DEDUP-FIX-REPORT.md
+.dedup.json

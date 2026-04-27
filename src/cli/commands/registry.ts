@@ -7,18 +7,11 @@ export function registerCommand(cmd: CommandDef): void {
   commands.set(cmd.name, cmd);
 }
 
-/** Get a command by name. */
-export function getCommand(name: string): CommandDef | undefined {
-  return commands.get(name);
-}
-
-/** List all registered commands. */
-export function listCommands(): CommandDef[] {
+function listCommands(): CommandDef[] {
   return [...commands.values()];
 }
 
-/** Check whether input starts with a registered /command. */
-export function parseCommand(input: string): { name: string; args: string } | null {
+function parseCommand(input: string): { name: string; args: string } | null {
   const trimmed = input.trim();
   if (!trimmed.startsWith("/")) return null;
 

@@ -12,11 +12,14 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "prepare": "husky",
     "prepack": "npm run build",
     "prestart": "npm run build",
     "start": "node dist/bridge.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "verify:push": "npm run typecheck && npm test && npm run build"
   },
   "keywords": [
     "chatgpt",
@@ -38,6 +41,7 @@
   "devDependencies": {
     "@types/node": "^22.15.3",
     "@types/react": "^18.3.12",
+    "husky": "^9.1.7",
     "knip": "^6.7.0",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3",

@@ -100,19 +100,19 @@ describe("loadHooksConfig", () => {
     const repoRoot = join(base, "repo");
     const homeDir = join(base, "home");
     await mkdir(join(repoRoot, ".bridge"), { recursive: true });
-    await mkdir(join(homeDir, ".chatgpt-bridge"), { recursive: true });
+    await mkdir(join(homeDir, ".chatgpt-local-bridge"), { recursive: true });
     await writeFile(
       join(repoRoot, ".bridge", "hooks.json"),
       JSON.stringify({ hooks: [{ event: "SessionStart", command: "local" }] }),
     );
     await writeFile(
-      join(homeDir, ".chatgpt-bridge", "hooks.json"),
+      join(homeDir, ".chatgpt-local-bridge", "hooks.json"),
       JSON.stringify({ hooks: [{ event: "SessionEnd", command: "user" }] }),
     );
 
     expect(hookConfigPaths(repoRoot, homeDir)).toEqual([
       join(repoRoot, ".bridge", "hooks.json"),
-      join(homeDir, ".chatgpt-bridge", "hooks.json"),
+      join(homeDir, ".chatgpt-local-bridge", "hooks.json"),
     ]);
 
     const loaded = await loadHooksConfig({ repoRoot, homeDir });

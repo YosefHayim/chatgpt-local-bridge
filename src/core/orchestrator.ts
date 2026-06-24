@@ -16,6 +16,7 @@ import {
   stopGenerating,
   attachFilesToPrompt,
   setupMcpConnectorInChatGpt,
+  isLikelyModelLabel,
 } from "../browser/chatgpt-page.ts";
 import { findModelProfile } from "./model-catalog.ts";
 
@@ -58,8 +59,13 @@ export class Orchestrator {
   async detectModel(): Promise<string> {
     if (!this.page) return this.modelName;
     const detected = await detectCurrentModel(this.page);
-    if (detected !== "ChatGPT" || this.modelName === "ChatGPT") {
+    // Adopt a real detected model immediately. When detection only yields the
+    // "ChatGPT" placeholder, keep an existing real name but discard junk (e.g. a
+    // stale config value), so a bad label can never persist across runs.
+    if (detected !== "ChatGPT") {
       this.modelName = detected;
+    } else if (!isLikelyModelLabel(this.modelName)) {
+      this.modelName = "ChatGPT";
     }
     const profile = findModelProfile(this.modelName);
     this.emit({ type: "status", text: `Model: ${this.modelName}` });
@@ -86,12 +92,22 @@ export class Orchestrator {
 
   async start(): Promise<void> {
     await this.syncConversationMessages();
-    await this.detectModel();
+    // Model detection opens the model menu, which can take seconds against the
+    // live UI. It only feeds the context-counter's window size (metadata), so it
+    // must never gate the round-trip — run it in the background.
+    this.detectModel().catch(() => {});
     this.emit({ type: "status", text: "Bridge ready. Type a prompt to begin." });
   }
 
-  /** Send a user prompt: inject into ChatGPT browser, wait for response, capture it. */
-  async sendPrompt(content: string): Promise<void> {
+  /**
+   * Send a user prompt: inject into ChatGPT browser, wait for the response, capture it.
+   *
+   * Emits `message`/`status`/`error` events for the live TUI, and also returns the
+   * captured assistant message so non-interactive callers (the headless `bridge ask`
+   * command) can read the reply directly. Returns null if the browser is not
+   * connected or the round-trip fails.
+   */
+  async sendPrompt(content: string): Promise<Message | null> {
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: "user",
@@ -104,7 +120,7 @@ export class Orchestrator {
 
     if (!this.page) {
       this.emit({ type: "error", error: "Browser not connected. Cannot send prompt." });
-      return;
+      return null;
     }
 
     try {
@@ -126,11 +142,13 @@ export class Orchestrator {
       this.messages.push(assistantMsg);
       this.emit({ type: "message", message: assistantMsg });
       this.emit({ type: "status", text: "Ready" });
+      return assistantMsg;
     } catch (err) {
       this.emit({
         type: "error",
         error: err instanceof Error ? err.message : String(err),
       });
+      return null;
     }
   }
 

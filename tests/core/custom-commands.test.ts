@@ -19,9 +19,9 @@ describe("custom commands", () => {
     const repoRoot = await tempDir();
     const homeDir = await tempDir();
     await mkdir(join(repoRoot, ".bridge", "commands"), { recursive: true });
-    await mkdir(join(homeDir, ".chatgpt-bridge", "commands"), { recursive: true });
+    await mkdir(join(homeDir, ".chatgpt-local-bridge", "commands"), { recursive: true });
     await writeFile(join(repoRoot, ".bridge", "commands", "review.md"), "Review $ARGUMENTS");
-    await writeFile(join(homeDir, ".chatgpt-bridge", "commands", "commit.md"), "Commit $1");
+    await writeFile(join(homeDir, ".chatgpt-local-bridge", "commands", "commit.md"), "Commit $1");
 
     const commands = await loadCustomCommands({ repoRoot, homeDir });
 

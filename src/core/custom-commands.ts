@@ -1,5 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
+import { isNodeError } from "./errors.ts";
+import { BRIDGE_DIR_NAME } from "./paths.ts";
 
 export type CustomCommandSource = "project" | "user";
 
@@ -37,7 +39,7 @@ export interface ParsedCommandFile {
 /** Discover markdown-backed custom commands from user and project command dirs. */
 export async function loadCustomCommands(options: LoadCustomCommandsOptions): Promise<CustomCommand[]> {
   const dirs: CommandDir[] = [
-    { source: "user", dir: resolve(options.homeDir ?? process.env.HOME ?? "", ".chatgpt-bridge", "commands") },
+    { source: "user", dir: resolve(options.homeDir ?? process.env.HOME ?? "", BRIDGE_DIR_NAME, "commands") },
     { source: "project", dir: resolve(options.repoRoot, ".bridge", "commands") },
   ];
 
@@ -185,8 +187,4 @@ function splitCommandArguments(input: string): string[] {
 
   if (current) args.push(current);
   return args;
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
 }

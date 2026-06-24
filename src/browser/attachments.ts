@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Page } from "playwright";
+import { isNodeError } from "../core/errors.ts";
 import type { Attachment, AttachmentManifest, AttachmentRole } from "../types/types.ts";
 
 const MARKER_PREFIX = "\u0000attachment:";
@@ -450,10 +451,6 @@ function emptyCounters(): AttachmentCounters {
     assistant: { image: 0, file: 0, pdf: 0 },
     user: { image: 0, file: 0, pdf: 0 },
   };
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

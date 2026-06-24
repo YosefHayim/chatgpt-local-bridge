@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import type { Dirent } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { hasErrorCode } from "./errors.ts";
+import { CHECKPOINTS_DIR } from "./paths.ts";
 
 export type CheckpointPhase = "before" | "after";
 
@@ -63,7 +64,7 @@ interface RepoPath {
   relativePath: string;
 }
 
-const DEFAULT_CHECKPOINT_ROOT = join(homedir(), ".chatgpt-bridge", "checkpoints");
+const DEFAULT_CHECKPOINT_ROOT = CHECKPOINTS_DIR;
 
 /** Resolve the per-repository checkpoint store path. */
 export function checkpointStorageRoot(
@@ -294,13 +295,4 @@ function toPosixPath(path: string): string {
 
 function sha256(input: string | Buffer): string {
   return createHash("sha256").update(input).digest("hex");
-}
-
-function hasErrorCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === code
-  );
 }

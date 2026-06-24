@@ -1,10 +1,6 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { homedir } from "node:os";
+import { BRIDGE_HOME, CONFIG_PATH } from "./paths.ts";
 import type { BridgeConfig } from "../types/types.ts";
-
-const CONFIG_DIR = join(homedir(), ".chatgpt-bridge");
-const CONFIG_PATH = join(CONFIG_DIR, "config.json");
 
 const DEFAULT_CONFIG: BridgeConfig = {
   repoPath: process.cwd(),
@@ -27,6 +23,6 @@ export async function loadConfig(overrides?: Partial<BridgeConfig>): Promise<Bri
 
 /** Persist config to disk so the next session reuses it. */
 export async function saveConfig(cfg: BridgeConfig): Promise<void> {
-  await mkdir(CONFIG_DIR, { recursive: true });
+  await mkdir(BRIDGE_HOME, { recursive: true });
   await writeFile(CONFIG_PATH, JSON.stringify(cfg, null, 2));
 }

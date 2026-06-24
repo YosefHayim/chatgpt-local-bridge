@@ -18,8 +18,8 @@ import { toolRegistry } from "../../mcp/tools/registry.ts";
 import { filesCommand } from "./files.ts";
 import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { EXPORTS_DIR, SCREENSHOTS_DIR } from "../../core/paths.ts";
 
 const commands = new Map<string, CommandDef>();
 const canonicalNames = new Set<string>();
@@ -355,7 +355,7 @@ const BUILTIN_COMMANDS: CommandDef[] = [
     handler: async (_args: string, ctx: CommandContext) => {
       const custom = await loadCustomCommands({ repoRoot: ctx.config.repoPath });
       if (custom.length === 0) {
-        console.log("No custom commands found in .bridge/commands or ~/.chatgpt-bridge/commands.");
+        console.log("No custom commands found in .bridge/commands or ~/.chatgpt-local-bridge/commands.");
         return;
       }
       console.log("\nCustom commands:\n");
@@ -720,7 +720,7 @@ async function resolveSessionExportArgs(
 }
 
 function defaultExportPath(sessionId: string): string {
-  return join(homedir(), ".chatgpt-bridge", "exports", `${sessionId}.md`);
+  return join(EXPORTS_DIR, `${sessionId}.md`);
 }
 
 function exportContentForPath(path: string, exported: SessionExport): string {
@@ -816,7 +816,7 @@ async function captureUrlScreenshots(url: string): Promise<string[]> {
   }
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const dir = join(homedir(), ".chatgpt-bridge", "screenshots", stamp);
+  const dir = join(SCREENSHOTS_DIR, stamp);
   await mkdir(dir, { recursive: true });
 
   const { chromium } = await import("playwright");

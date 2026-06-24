@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { hasErrorCode } from "./errors.ts";
+import { HOOKS_FILE, homeHooksPath } from "./paths.ts";
 
 export const HOOK_LIFECYCLE_EVENTS = [
   "SessionStart",
@@ -55,8 +57,8 @@ interface RawHookFields {
 /** Return hook config search paths in deterministic load order. */
 export function hookConfigPaths(repoRoot: string, homeDir = homedir()): string[] {
   return [
-    join(repoRoot, ".bridge", "hooks.json"),
-    join(homeDir, ".chatgpt-bridge", "hooks.json"),
+    join(repoRoot, ".bridge", HOOKS_FILE),
+    homeHooksPath(homeDir),
   ];
 }
 
@@ -234,15 +236,6 @@ function asRecord(raw: unknown): Record<string, unknown> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function hasErrorCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === code
-  );
 }
 
 function errorMessage(error: unknown): string {

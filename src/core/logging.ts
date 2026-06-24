@@ -1,8 +1,6 @@
 import { mkdir, appendFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
-
-const LOG_DIR = join(homedir(), ".chatgpt-bridge", "logs");
+import { LOGS_DIR } from "./paths.ts";
 
 export interface BridgeLogEvent {
   repoPath: string;
@@ -12,12 +10,12 @@ export interface BridgeLogEvent {
 
 /** Return today's bridge log path. */
 export function bridgeLogPath(date = new Date()): string {
-  return join(LOG_DIR, `${formatLocalDate(date)}.jsonl`);
+  return join(LOGS_DIR, `${formatLocalDate(date)}.jsonl`);
 }
 
 /** Append one JSONL event to the local bridge log. */
 export async function appendBridgeLog(event: BridgeLogEvent): Promise<void> {
-  await mkdir(LOG_DIR, { recursive: true });
+  await mkdir(LOGS_DIR, { recursive: true });
   const line = JSON.stringify({
     ts: new Date().toISOString(),
     repoPath: event.repoPath,

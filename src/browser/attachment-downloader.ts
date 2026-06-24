@@ -2,6 +2,7 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Page } from "playwright";
 import { loadManifest } from "./attachments.ts";
+import { isNodeError } from "../core/errors.ts";
 import type { Attachment } from "../types/types.ts";
 
 interface DownloadOptions {
@@ -283,8 +284,4 @@ function isSameAttachment(left: Attachment, right: Attachment): boolean {
   return left.id === right.id
     && left.url === right.url
     && left.filename === right.filename;
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
 }

@@ -25,6 +25,12 @@ export interface McpServerOptions {
   onToolAction?: (action: McpToolAction) => void | Promise<void>;
 }
 
+/** A running MCP server: its local base URL and a handle to stop it. */
+export interface McpServerHandle {
+  url: string;
+  close: () => void;
+}
+
 interface McpConnection {
   server: McpServer;
   transport: SSEServerTransport;
@@ -45,7 +51,7 @@ export function startMcpServer(
   repoRoot: string,
   port: number,
   options: McpServerOptions = {},
-): Promise<{ url: string; close: () => void }> {
+): Promise<McpServerHandle> {
   const httpServer = createServer();
   const connections = new Map<string, McpConnection>();
   const streamableConnections = new Map<string, StreamableMcpConnection>();

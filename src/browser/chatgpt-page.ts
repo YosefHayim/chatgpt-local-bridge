@@ -24,7 +24,7 @@ const SELECTORS = {
   /** Model menu triggers in the ChatGPT shell. */
   modelTrigger: [
     'button[data-testid="model-switcher-dropdown-button"]',
-    'button[aria-label*="model" i]',
+    'button[aria-label="Switch model"]',
     'button:has-text("GPT")',
     'button:has-text("ChatGPT")',
     'button:has-text("o3")',
@@ -65,14 +65,26 @@ const BRIDGE_CONNECTOR_PREFIX = "chatgpt-local-bridge";
 
 /** Type a prompt into ChatGPT's input field and send it. */
 export async function injectPrompt(page: Page, text: string): Promise<void> {
+  // Foreground the tab first. A backgrounded CDP-driven tab has its timers and
+  // its response SSE stream throttled by Chrome, which stalls ChatGPT streaming
+  // for minutes and looks like a hang. Bringing it to front keeps streaming live.
+  await page.bringToFront().catch(() => {});
+
   const input = page.locator(SELECTORS.promptInput).first();
   await input.click();
   await input.fill(text);
   await input.dispatchEvent("input");
 
+  // Prefer the explicit send button; fall back to Enter if its selector drifts.
+  // ChatGPT's composer submits on Enter (Shift+Enter inserts a newline), so this
+  // keeps sending working even when the button markup changes.
   const sendBtn = page.locator(SELECTORS.sendButton).first();
-  await sendBtn.waitFor({ state: "visible", timeout: 10_000 });
-  await sendBtn.click();
+  try {
+    await sendBtn.waitFor({ state: "visible", timeout: 5_000 });
+    await sendBtn.click();
+  } catch {
+    await page.keyboard.press("Enter");
+  }
 }
 
 interface ResponseWaitOptions {
@@ -203,8 +215,11 @@ export async function detectCurrentModel(page: Page): Promise<string> {
       const line = text.split("\n").find((part) => isLikelyModelLabel(part));
       if (line) return line;
 
+      // Only trust the aria-label if it actually names a model. Conversation
+      // titles containing "Model" otherwise leak in via buttons like
+      // "Pin <title>" or "Open conversation options for <title>".
       const ariaLabel = await trigger.getAttribute("aria-label").catch(() => null);
-      if (ariaLabel?.trim()) return ariaLabel.trim();
+      if (ariaLabel && isLikelyModelLabel(ariaLabel)) return ariaLabel.trim();
     }
 
     const checkedFromMenu = await detectCheckedModelFromMenu(page);
@@ -1041,7 +1056,7 @@ async function clickConnectorMenuItem(page: Page, connectorName: string): Promis
 }
 
 async function openModelMenu(page: Page): Promise<void> {
-  await page.locator('button[data-testid="model-switcher-dropdown-button"]').first()
+  await page.locator(SELECTORS.modelTrigger.join(", ")).first()
     .waitFor({ state: "visible", timeout: 5_000 })
     .catch(() => {});
   const trigger = await firstVisible(page, SELECTORS.modelTrigger);
@@ -1140,7 +1155,8 @@ function normalizeModelQuery(value: string): string {
     .trim();
 }
 
-function isLikelyModelLabel(value: string): boolean {
+/** True when a string looks like a real ChatGPT model name (vs. arbitrary UI text). */
+export function isLikelyModelLabel(value: string): boolean {
   return /\b(gpt|chatgpt|o[1-9]|claude|glm)\b/i.test(value);
 }
 

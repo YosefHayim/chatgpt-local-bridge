@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isNodeError } from "./errors.ts";
 
 export interface ProjectInstructionFile {
   fileName: "AGENTS.md" | "CLAUDE.md";
@@ -45,8 +46,4 @@ async function readOptionalFile(path: string): Promise<string | null> {
     if (isNodeError(error) && error.code === "ENOENT") return null;
     throw error;
   }
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
 }

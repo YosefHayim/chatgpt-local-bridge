@@ -1,24 +1,12 @@
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page, type Response } from "playwright";
+import { CHROME_PROFILE_DIR } from "../core/paths.ts";
 import type { Conversation } from "../types/types.ts";
 
-const DEBUG_PORT = 9222;
+/** Chrome remote-debugging port the bridge attaches to / spawns on. */
+export const BRIDGE_DEBUG_PORT = 9222;
 const CHROME_BIN = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-
-/**
- * Dedicated Chrome user-data directory owned entirely by this bridge.
- *
- * Chrome ≥136 refuses to open a remote-debug port when the requested
- * user-data-dir is already in use by another Chrome process, and the
- * symlink-bridge approach that copied the real profile caused Chrome to
- * corrupt/reset session cookies on every launch.  Using a completely
- * separate, persistent directory sidesteps both problems: the user logs
- * in once and the session persists across bridge restarts.
- */
-const BRIDGE_PROFILE_DIR = join(homedir(), ".chatgpt-local-bridge", "chrome-profile");
 
 /** Manages the Playwright browser instance connected to the bridge's isolated Chrome profile. */
 export class BrowserManager {
@@ -38,20 +26,20 @@ export class BrowserManager {
   async launch(): Promise<Page> {
     if (this.context || this.browser) await this.close();
 
-    mkdirSync(BRIDGE_PROFILE_DIR, { recursive: true });
+    mkdirSync(CHROME_PROFILE_DIR, { recursive: true });
 
     // Fast path: reuse a Chrome instance already listening on the debug port
     try {
-      this.browser = await chromium.connectOverCDP(`http://localhost:${DEBUG_PORT}`);
+      this.browser = await chromium.connectOverCDP(`http://localhost:${BRIDGE_DEBUG_PORT}`);
       const found = this.findChatGptPageInAllContexts();
       if (found) {
         this.context = found.context;
         this.page = found.page;
-        console.log("  Connected to running Chrome, found chatgpt.com tab.");
+        console.error("  Connected to running Chrome, found chatgpt.com tab.");
       } else {
         this.context = this.browser.contexts()[0]!;
         this.page = await this.context.newPage();
-        console.log("  Connected to running Chrome, no chatgpt.com tab — opening one.");
+        console.error("  Connected to running Chrome, no chatgpt.com tab — opening one.");
       }
       this.interceptResponses();
       await this.navigateIfNeeded();
@@ -62,8 +50,8 @@ export class BrowserManager {
 
     // Slow path: spawn Chrome with the bridge profile and wait for the debug port
     const child = spawn(CHROME_BIN, [
-      `--user-data-dir=${BRIDGE_PROFILE_DIR}`,
-      `--remote-debugging-port=${DEBUG_PORT}`,
+      `--user-data-dir=${CHROME_PROFILE_DIR}`,
+      `--remote-debugging-port=${BRIDGE_DEBUG_PORT}`,
       "--no-first-run",
       "--no-default-browser-check",
       "https://chatgpt.com",
@@ -73,10 +61,10 @@ export class BrowserManager {
     });
     child.unref();
 
-    console.log("  Waiting for Chrome debug port...");
-    await waitForDebugPort(DEBUG_PORT, 30_000);
+    console.error("  Waiting for Chrome debug port...");
+    await waitForDebugPort(BRIDGE_DEBUG_PORT, 30_000);
 
-    this.browser = await chromium.connectOverCDP(`http://localhost:${DEBUG_PORT}`);
+    this.browser = await chromium.connectOverCDP(`http://localhost:${BRIDGE_DEBUG_PORT}`);
     const found = this.findChatGptPageInAllContexts();
     this.context = found?.context ?? this.browser.contexts()[0]!;
     this.page = found?.page ?? await this.context.newPage();

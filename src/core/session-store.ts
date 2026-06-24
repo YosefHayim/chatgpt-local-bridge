@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { appendFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { hasErrorCode } from "./errors.ts";
+import { SESSIONS_DIR } from "./paths.ts";
 
 const METADATA_FILE = "metadata.json";
 const EVENTS_FILE = "events.jsonl";
@@ -10,7 +11,7 @@ const SAFE_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 type TimestampInput = Date | string;
 
 export interface SessionStoreOptions {
-  /** Defaults to ~/.chatgpt-bridge/sessions. Tests should pass an explicit directory. */
+  /** Defaults to ~/.chatgpt-local-bridge/sessions. Tests should pass an explicit directory. */
   baseDir?: string;
   now?: () => Date;
   createId?: () => string;
@@ -80,7 +81,7 @@ export interface SessionExport extends SessionRecord {
 }
 
 export function defaultSessionStoreDir(): string {
-  return join(homedir(), ".chatgpt-bridge", "sessions");
+  return SESSIONS_DIR;
 }
 
 export async function createSession(
@@ -412,12 +413,6 @@ function readNumber(record: Record<string, unknown>, key: string, source: string
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function hasErrorCode(error: unknown, code: string): boolean {
-  return error instanceof Error
-    && "code" in error
-    && (error as NodeJS.ErrnoException).code === code;
 }
 
 function formatTranscript(events: SessionEvent[]): string {

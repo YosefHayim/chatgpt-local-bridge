@@ -21,6 +21,8 @@ const SELECTORS = {
     'button[aria-label*="Stop" i]',
     'button[data-testid="stop-button"]',
   ].join(", "),
+  /** ChatGPT-generated images render outside the role block, served from the estuary content endpoint. */
+  generatedImage: 'img[src*="/backend-api/estuary/content"], img[alt^="Generated image" i]',
   /** Model menu triggers in the ChatGPT shell. */
   modelTrigger: [
     'button[data-testid="model-switcher-dropdown-button"]',
@@ -98,7 +100,7 @@ export async function waitForResponse(
   page: Page,
   options: number | ResponseWaitOptions = {},
 ): Promise<void> {
-  const timeout = typeof options === "number" ? options : options.timeout ?? 120_000;
+  const timeout = typeof options === "number" ? options : options.timeout ?? 300_000;
   const previousAssistantCount = typeof options === "number" ? undefined : options.previousAssistantCount;
   const previousLastAssistantText = typeof options === "number"
     ? undefined
@@ -1168,14 +1170,18 @@ async function waitForLastAssistantTextStable(page: Page, timeout: number): Prom
   while (Date.now() - startedAt < timeout) {
     const text = normalizeDisplayText(await captureLastResponse(page).catch(() => ""));
     const streaming = await page.locator(SELECTORS.streamingIndicator).first().isVisible().catch(() => false);
+    const hasGeneratedImage = (await page.locator(SELECTORS.generatedImage).count().catch(() => 0)) > 0;
 
     if (text !== lastText) {
       lastText = text;
       stableSince = Date.now();
     }
 
+    // An image-only turn produces no assistant text, so settle on a rendered
+    // generated image too — otherwise such turns never complete.
+    const hasContent = (!!text && !isTransientAssistantText(text)) || hasGeneratedImage;
     const stableForMs = Date.now() - stableSince;
-    if (text && stableForMs >= 1_500 && !streaming && !isTransientAssistantText(text)) {
+    if (hasContent && stableForMs >= 1_500 && !streaming) {
       return;
     }
 

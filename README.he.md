@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hero.png" alt="chatgpt-local-bridge — drive a ChatGPT browser session from your terminal over a sandboxed MCP bridge" width="640" />
+</p>
+
 # chatgpt-local-bridge
 
 [English](README.md) · **עברית** · [Español](README.es.md) · [中文](README.zh.md)

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hero.png" alt="chatgpt-local-bridge — drive a ChatGPT browser session from your terminal over a sandboxed MCP bridge" width="640" />
+</p>
+
 # chatgpt-local-bridge
 
 > Drive a real ChatGPT browser conversation from your terminal, and give it a narrow, sandboxed set of local repo tools over MCP — without ever handing it a shell.

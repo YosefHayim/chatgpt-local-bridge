@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hero.png" alt="chatgpt-local-bridge — controla una sesión de ChatGPT en el navegador desde tu terminal mediante un puente MCP aislado" width="640" />
+</p>
+
 # chatgpt-local-bridge
 
 [English](README.md) · [עברית](README.he.md) · **Español** · [中文](README.zh.md)

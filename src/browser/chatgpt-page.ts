@@ -21,6 +21,8 @@ const SELECTORS = {
     'button[aria-label*="Stop" i]',
     'button[data-testid="stop-button"]',
   ].join(", "),
+  /** ChatGPT-generated images render outside the role block, served from the estuary content endpoint. */
+  generatedImage: 'img[src*="/backend-api/estuary/content"], img[alt^="Generated image" i]',
   /** Model menu triggers in the ChatGPT shell. */
   modelTrigger: [
     'button[data-testid="model-switcher-dropdown-button"]',
@@ -63,7 +65,18 @@ const SELECTORS = {
 const DEFAULT_CONNECTOR_NAME = "chatgpt-local-bridge";
 const BRIDGE_CONNECTOR_PREFIX = "chatgpt-local-bridge";
 
-/** Type a prompt into ChatGPT's input field and send it. */
+/**
+ * Type a prompt into ChatGPT's input field, send it, and confirm it actually left
+ * the composer before returning.
+ *
+ * The send click can silently no-op: right after an image-generation turn, and
+ * intermittently under load, ChatGPT swallows the click (or the button is briefly
+ * inert) so the prompt stays in the composer un-submitted and nothing throws. The
+ * caller would then wait out the full response timeout for a reply that never
+ * comes. A real send empties `#prompt-textarea`, so we poll the composer text and
+ * re-send if it's still populated. Throwing fast after a few failed attempts beats
+ * a multi-minute false timeout downstream.
+ */
 export async function injectPrompt(page: Page, text: string): Promise<void> {
   // Foreground the tab first. A backgrounded CDP-driven tab has its timers and
   // its response SSE stream throttled by Chrome, which stalls ChatGPT streaming
@@ -71,20 +84,46 @@ export async function injectPrompt(page: Page, text: string): Promise<void> {
   await page.bringToFront().catch(() => {});
 
   const input = page.locator(SELECTORS.promptInput).first();
-  await input.click();
-  await input.fill(text);
-  await input.dispatchEvent("input");
 
-  // Prefer the explicit send button; fall back to Enter if its selector drifts.
-  // ChatGPT's composer submits on Enter (Shift+Enter inserts a newline), so this
-  // keeps sending working even when the button markup changes.
-  const sendBtn = page.locator(SELECTORS.sendButton).first();
-  try {
-    await sendBtn.waitFor({ state: "visible", timeout: 5_000 });
-    await sendBtn.click();
-  } catch {
-    await page.keyboard.press("Enter");
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await input.click();
+    await input.fill(text);
+    await input.dispatchEvent("input");
+
+    // Prefer the explicit send button; fall back to Enter if its selector drifts.
+    // ChatGPT's composer submits on Enter (Shift+Enter inserts a newline), so this
+    // keeps sending working even when the button markup changes.
+    const sendBtn = page.locator(SELECTORS.sendButton).first();
+    try {
+      await sendBtn.waitFor({ state: "visible", timeout: 5_000 });
+      await sendBtn.click();
+    } catch {
+      await page.keyboard.press("Enter");
+    }
+
+    if (await composerClears(page)) return;
   }
+
+  throw new Error("injectPrompt: composer never cleared after 3 send attempts");
+}
+
+/**
+ * Poll the composer until it empties, signalling the prompt was actually sent.
+ *
+ * A successful submit clears `#prompt-textarea`; a no-op leaves the typed text in
+ * place. We read `innerText` directly (rather than relying on a selector match)
+ * because the contenteditable keeps its node after send and only its text drains.
+ * Returns false once the poll budget is spent so the caller can re-send.
+ */
+async function composerClears(page: Page): Promise<boolean> {
+  for (let poll = 0; poll < 10; poll += 1) {
+    const composerText = await page.evaluate(
+      () => (document.querySelector<HTMLElement>("#prompt-textarea")?.innerText ?? "").trim(),
+    );
+    if (composerText === "") return true;
+    await page.waitForTimeout(500);
+  }
+  return false;
 }
 
 interface ResponseWaitOptions {
@@ -98,7 +137,7 @@ export async function waitForResponse(
   page: Page,
   options: number | ResponseWaitOptions = {},
 ): Promise<void> {
-  const timeout = typeof options === "number" ? options : options.timeout ?? 120_000;
+  const timeout = typeof options === "number" ? options : options.timeout ?? 300_000;
   const previousAssistantCount = typeof options === "number" ? undefined : options.previousAssistantCount;
   const previousLastAssistantText = typeof options === "number"
     ? undefined
@@ -1160,22 +1199,68 @@ export function isLikelyModelLabel(value: string): boolean {
   return /\b(gpt|chatgpt|o[1-9]|claude|glm)\b/i.test(value);
 }
 
+/** Quiet window a plain text turn must hold before it counts as settled. */
+const SETTLE_QUIET_MS = 1_500;
+/**
+ * Longer quiet window required when generated assets are present. ChatGPT can
+ * briefly hide the stop indicator between sequential images/files in one turn,
+ * so a short window would settle early and interrupt the remaining generations.
+ */
+const ASSET_SETTLE_QUIET_MS = 2_500;
+
+/**
+ * Decide whether the current assistant turn has finished producing output.
+ *
+ * Pure so the completion policy is unit-testable without a browser. A turn is
+ * settled only when streaming has stopped AND the relevant content has held
+ * still long enough: asset turns need the longer {@link ASSET_SETTLE_QUIET_MS}
+ * window (multiple images can arrive in sequence), plain text turns use
+ * {@link SETTLE_QUIET_MS}. An empty, asset-less turn never settles, and
+ * transient placeholder text (e.g. "Thinking…") does not count as content.
+ */
+export function isTurnSettled(state: {
+  hasText: boolean;
+  isTransientText: boolean;
+  assetCount: number;
+  streaming: boolean;
+  stableForMs: number;
+}): boolean {
+  if (state.streaming) return false;
+
+  const requiredQuietMs = state.assetCount > 0 ? ASSET_SETTLE_QUIET_MS : SETTLE_QUIET_MS;
+  if (state.stableForMs < requiredQuietMs) return false;
+
+  return state.assetCount > 0 || (state.hasText && !state.isTransientText);
+}
+
 async function waitForLastAssistantTextStable(page: Page, timeout: number): Promise<void> {
   const startedAt = Date.now();
   let lastText = "";
+  let lastAssetCount = 0;
   let stableSince = Date.now();
 
   while (Date.now() - startedAt < timeout) {
     const text = normalizeDisplayText(await captureLastResponse(page).catch(() => ""));
     const streaming = await page.locator(SELECTORS.streamingIndicator).first().isVisible().catch(() => false);
+    const assetCount = await page.locator(SELECTORS.generatedImage).count().catch(() => 0);
 
-    if (text !== lastText) {
+    // Reset the quiet window whenever the text OR the asset count changes, so a
+    // newly-arriving 2nd/3rd image keeps the wait alive instead of tripping early.
+    if (text !== lastText || assetCount !== lastAssetCount) {
       lastText = text;
+      lastAssetCount = assetCount;
       stableSince = Date.now();
     }
 
-    const stableForMs = Date.now() - stableSince;
-    if (text && stableForMs >= 1_500 && !streaming && !isTransientAssistantText(text)) {
+    if (
+      isTurnSettled({
+        hasText: !!text,
+        isTransientText: isTransientAssistantText(text),
+        assetCount,
+        streaming,
+        stableForMs: Date.now() - stableSince,
+      })
+    ) {
       return;
     }
 

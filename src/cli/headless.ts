@@ -5,7 +5,6 @@ import { startEngine } from "../core/engine.ts";
 import { listSessions } from "../core/session-store.ts";
 import { extractAllMessages } from "../browser/attachments.ts";
 import { BrowserManager, BRIDGE_DEBUG_PORT } from "../browser/manager.ts";
-import type { CommandContext } from "../types/types.ts";
 
 /**
  * Non-interactive `bridge` subcommands.
@@ -70,11 +69,6 @@ interface DownloadResult {
   error?: string;
 }
 
-/** Minimal structural view of the orchestrator's Playwright page, mirroring files.ts. */
-interface RuntimeOrchestrator {
-  page?: Page | null;
-}
-
 /** Subset of the attachment-downloader module loaded dynamically, mirroring files.ts. */
 interface AttachmentDownloaderModule {
   downloadAll: (
@@ -110,17 +104,7 @@ export async function runDownload(options: DownloadCmdOptions): Promise<void> {
     fail("Browser not connected. Run `bridge login` once to sign in to ChatGPT.");
   }
 
-  // Access the live page the same way files.ts does. The orchestrator's `page`
-  // is a private class field, so first widen to the structural CommandContext
-  // view (a plain assignment, which Orchestrator satisfies), then read `page`
-  // off that view intersected with RuntimeOrchestrator — mirroring files.ts.
-  const structural: CommandContext["orchestrator"] = engine.orchestrator;
-  const page = (structural as CommandContext["orchestrator"] & RuntimeOrchestrator).page ?? null;
-  if (!page) {
-    await engine.shutdown({ closeBrowser: false });
-    fail("Browser not connected. Cannot download attachments.");
-  }
-
+  const page = engine.browser.getPage();
   const conversationId = options.conversation ?? conversationIdFromPage(page);
   await extractAllMessages(page, { conversationId });
 

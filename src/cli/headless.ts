@@ -5,6 +5,7 @@ import { startEngine } from "../core/engine.ts";
 import { listSessions } from "../core/session-store.ts";
 import { extractAllMessages } from "../browser/attachments.ts";
 import { downloadAll } from "../browser/attachment-downloader.ts";
+import { assertSignedIn } from "../browser/chatgpt-page.ts";
 import { BrowserManager, BRIDGE_DEBUG_PORT } from "../browser/manager.ts";
 
 /**
@@ -188,6 +189,13 @@ export async function runAsk(prompt: string, options: AskOptions): Promise<void>
     fail("Browser not connected. Run `bridge login` once to sign in to ChatGPT.");
   }
 
+  try {
+    await assertSignedIn(engine.browser.getPage());
+  } catch (err) {
+    await engine.shutdown({ closeBrowser: false });
+    fail(err instanceof Error ? err.message : String(err));
+  }
+
   if (options.fresh) await engine.orchestrator.newConversation().catch(() => {});
 
   const timeoutMs = timeoutMsFromSeconds(options.timeout);
@@ -228,8 +236,9 @@ export async function runLogin(options: { repo?: string } = {}): Promise<void> {
   const browser = new BrowserManager(options.repo ? resolve(options.repo) : undefined);
   await browser.launch();
   process.stderr.write(
-    "Chrome is open on the chatgpt-local-bridge profile.\n" +
-      "If chatgpt.com shows a login wall, sign in now — the session persists across runs.\n" +
+    "Bridge Chrome is open (isolated profile — NOT your daily browser).\n" +
+      "If you see a Log in button, click it and sign in NOW in this window.\n" +
+      "Your main Chrome cookies do not carry over. Sign-in persists across runs.\n" +
       "Leave this window open; `bridge ask` will reconnect to it.\n",
   );
   process.exit(0);

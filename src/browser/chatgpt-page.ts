@@ -65,6 +65,31 @@ const SELECTORS = {
 const DEFAULT_CONNECTOR_NAME = "chatgpt-local-bridge";
 const BRIDGE_CONNECTOR_PREFIX = "chatgpt-local-bridge";
 
+/** Thrown when ChatGPT shows the guest login wall instead of a signed-in session. */
+export class GuestSessionError extends Error {
+  constructor() {
+    super(
+      "ChatGPT is in guest mode (Log in button visible). " +
+        "This is the bridge's isolated Chrome — not your daily browser. " +
+        "Click Log in in that window, complete sign-in, leave it open, then run again.",
+    );
+    this.name = "GuestSessionError";
+  }
+}
+
+/** True when ChatGPT is showing the unauthenticated guest shell. */
+export async function isGuestSession(page: Page): Promise<boolean> {
+  const login = page.locator('[data-testid="login-button"]');
+  if (await login.isVisible({ timeout: 1500 }).catch(() => false)) return true;
+  const signup = page.locator('[data-testid="signup-button"]');
+  return signup.isVisible({ timeout: 500 }).catch(() => false);
+}
+
+/** Fail fast before sending a prompt to an unauthenticated guest session. */
+export async function assertSignedIn(page: Page): Promise<void> {
+  if (await isGuestSession(page)) throw new GuestSessionError();
+}
+
 /**
  * Type a prompt into ChatGPT's input field, send it, and confirm it actually left
  * the composer before returning.

@@ -79,10 +79,22 @@ export class GuestSessionError extends Error {
 
 /** True when ChatGPT is showing the unauthenticated guest shell. */
 export async function isGuestSession(page: Page): Promise<boolean> {
+  // Signed-in users get the profile/account control; prefer that over login-button
+  // presence (the login CTA can linger in the DOM on some ChatGPT layouts).
+  const account = page.locator(SELECTORS.accountMenuButton.join(", "));
+  if (await account.first().isVisible({ timeout: 2500 }).catch(() => false)) {
+    return false;
+  }
+
   const login = page.locator('[data-testid="login-button"]');
   if (await login.isVisible({ timeout: 1500 }).catch(() => false)) return true;
+
   const signup = page.locator('[data-testid="signup-button"]');
-  return signup.isVisible({ timeout: 500 }).catch(() => false);
+  if (await signup.isVisible({ timeout: 500 }).catch(() => false)) return true;
+
+  // No account menu and no composer usually means the login wall.
+  const prompt = page.locator(SELECTORS.promptInput);
+  return !(await prompt.first().isVisible({ timeout: 1500 }).catch(() => false));
 }
 
 /** Fail fast before sending a prompt to an unauthenticated guest session. */

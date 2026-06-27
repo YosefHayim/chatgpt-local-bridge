@@ -23,6 +23,8 @@ interface AskOptions {
   port?: string;
   /** Start a fresh ChatGPT conversation before sending. */
   fresh?: boolean;
+  /** Switch ChatGPT model before sending (e.g. "GPT-4o"). */
+  model?: string;
   /** Bring up the tunnel + connector so ChatGPT can call local MCP tools. */
   tools?: boolean;
   /** Emit a JSON object instead of plain reply text. */
@@ -197,6 +199,10 @@ export async function runAsk(prompt: string, options: AskOptions): Promise<void>
   }
 
   if (options.fresh) await engine.orchestrator.newConversation().catch(() => {});
+
+  if (options.model) {
+    await engine.orchestrator.switchModel(options.model).catch(() => {});
+  }
 
   const timeoutMs = timeoutMsFromSeconds(options.timeout);
   const reply = await engine.ask(prompt, { timeoutMs });

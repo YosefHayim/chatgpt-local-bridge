@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hero.png" alt="chatgpt-local-bridge — 从终端驱动浏览器中的真实 ChatGPT 会话，通过隔离的 MCP 桥接访问本地仓库工具" width="640" />
+</p>
+
 # chatgpt-local-bridge
 
 [English](README.md) · [עברית](README.he.md) · [Español](README.es.md) · **中文**

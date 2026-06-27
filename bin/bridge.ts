@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import React from "react";
 import { BridgeApp } from "../src/cli/app.tsx";
 import { startEngine } from "../src/core/engine.ts";
-import { runAsk, runSessions, runLogin, runStop } from "../src/cli/headless.ts";
+import { runAsk, runDownload, runSessions, runLogin, runStop } from "../src/cli/headless.ts";
 import type { Message } from "../src/types/types.ts";
 
 /** Launch the interactive Ink TUI on top of a shared engine. */
@@ -78,7 +78,19 @@ program
   .option("--json", "Emit a JSON object { sessionId, model, reply, contextTokens }")
   .option("--tools", "Start the tunnel + connector so ChatGPT can call local tools")
   .option("--fresh", "Start a new ChatGPT conversation before asking")
+  .option("--timeout <seconds>", "Max seconds to wait for ChatGPT's reply (default 300)")
   .action((promptParts: string[], options) => runAsk(promptParts.join(" "), options));
+
+program
+  .command("download")
+  .description("Download a conversation's attachments/images (non-interactive)")
+  .option("-r, --repo <path>", "Target repository")
+  .option("-p, --port <number>", "MCP server port")
+  .option("--conversation <id>", "Conversation id (default: current page)")
+  .option("--out <dir>", "Output directory (default: ./downloads/<id>)")
+  .option("--id <attachmentId...>", "Specific attachment id(s); omit to download all")
+  .option("--json", "Emit a JSON array of results")
+  .action(runDownload);
 
 program
   .command("sessions")

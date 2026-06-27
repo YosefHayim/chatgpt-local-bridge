@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/hero.png" alt="chatgpt-local-bridge — drive a ChatGPT browser session from your terminal over a sandboxed MCP bridge" width="640" />
+  <img src="assets/hero.png" alt="ai-browser-bridge — drive ChatGPT or Gemini from your terminal over a sandboxed MCP bridge" width="640" />
 </p>
 
 # ai-browser-bridge
@@ -72,8 +72,8 @@ Four layers, each with one job:
 **Install & build**
 
 ```bash
-git clone https://github.com/YosefHayim/chatgpt-local-bridge.git
-cd chatgpt-local-bridge
+git clone https://github.com/YosefHayim/ai-browser-bridge.git
+cd ai-browser-bridge
 pnpm install
 pnpm build
 ```

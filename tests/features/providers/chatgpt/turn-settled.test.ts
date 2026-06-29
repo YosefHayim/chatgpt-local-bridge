@@ -1,88 +1,134 @@
 import { describe, expect, it } from "vitest";
-import { isTurnSettled } from "../../../../src/features/providers/chatgpt/chatgpt-page.class.ts";
+import {
+  countExpectedImageMarkers,
+  isTurnSettled,
+} from "../../../../src/features/providers/chatgpt/chatgpt-page.class.ts";
+
+function settledState(overrides: Partial<Parameters<typeof isTurnSettled>[0]> = {}) {
+  return {
+    hasText: false,
+    isTransientText: false,
+    assetCount: 0,
+    loadedAssetCount: 0,
+    pendingAssetCount: 0,
+    expectedImageMarkerCount: 0,
+    streaming: false,
+    stableForMs: 0,
+    ...overrides,
+  };
+}
+
+describe("countExpectedImageMarkers", () => {
+  it("counts image markers in assistant text", () => {
+    expect(countExpectedImageMarkers("[image-12][image-13]")).toBe(2);
+  });
+});
 
 describe("isTurnSettled", () => {
   it("never settles while streaming, even after a long quiet window", () => {
     expect(
-      isTurnSettled({
-        hasText: true,
-        isTransientText: false,
-        assetCount: 0,
-        streaming: true,
-        stableForMs: 10_000,
-      }),
+      isTurnSettled(
+        settledState({
+          hasText: true,
+          streaming: true,
+          stableForMs: 10_000,
+        }),
+      ),
     ).toBe(false);
   });
 
   it("settles a text turn once it holds past the short quiet window", () => {
     expect(
-      isTurnSettled({
-        hasText: true,
-        isTransientText: false,
-        assetCount: 0,
-        streaming: false,
-        stableForMs: 1_600,
-      }),
+      isTurnSettled(
+        settledState({
+          hasText: true,
+          stableForMs: 1_600,
+        }),
+      ),
     ).toBe(true);
   });
 
   it("does not settle a text turn before the short quiet window elapses", () => {
     expect(
-      isTurnSettled({
-        hasText: true,
-        isTransientText: false,
-        assetCount: 0,
-        streaming: false,
-        stableForMs: 1_000,
-      }),
+      isTurnSettled(
+        settledState({
+          hasText: true,
+          stableForMs: 1_000,
+        }),
+      ),
     ).toBe(false);
   });
 
   it("never settles on transient placeholder text", () => {
     expect(
-      isTurnSettled({
-        hasText: true,
-        isTransientText: true,
-        assetCount: 0,
-        streaming: false,
-        stableForMs: 5_000,
-      }),
+      isTurnSettled(
+        settledState({
+          hasText: true,
+          isTransientText: true,
+          stableForMs: 5_000,
+        }),
+      ),
     ).toBe(false);
   });
 
-  it("settles a multi-image turn once it holds past the longer asset window", () => {
+  it("does not settle when image markers appear before images finish loading", () => {
     expect(
-      isTurnSettled({
-        hasText: false,
-        isTransientText: false,
-        assetCount: 2,
-        streaming: false,
-        stableForMs: 12_600,
-      }),
+      isTurnSettled(
+        settledState({
+          hasText: true,
+          expectedImageMarkerCount: 2,
+          loadedAssetCount: 0,
+          stableForMs: 20_000,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not settle while generated images are still pending", () => {
+    expect(
+      isTurnSettled(
+        settledState({
+          assetCount: 2,
+          loadedAssetCount: 1,
+          pendingAssetCount: 1,
+          stableForMs: 20_000,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("settles a loaded image turn once it holds past the longer asset window", () => {
+    expect(
+      isTurnSettled(
+        settledState({
+          assetCount: 2,
+          loadedAssetCount: 2,
+          expectedImageMarkerCount: 2,
+          stableForMs: 12_600,
+        }),
+      ),
     ).toBe(true);
   });
 
   it("keeps waiting on an image turn until the longer asset window is met", () => {
     expect(
-      isTurnSettled({
-        hasText: false,
-        isTransientText: false,
-        assetCount: 2,
-        streaming: false,
-        stableForMs: 11_999,
-      }),
+      isTurnSettled(
+        settledState({
+          assetCount: 2,
+          loadedAssetCount: 2,
+          stableForMs: 11_999,
+        }),
+      ),
     ).toBe(false);
   });
 
   it("never settles an empty, asset-less turn", () => {
     expect(
-      isTurnSettled({
-        hasText: false,
-        isTransientText: false,
-        assetCount: 0,
-        streaming: false,
-        stableForMs: 9_999,
-      }),
+      isTurnSettled(
+        settledState({
+          stableForMs: 9_999,
+        }),
+      ),
     ).toBe(false);
   });
 });

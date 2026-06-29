@@ -727,6 +727,52 @@ const LAST_ASSISTANT_MESSAGE_SNAPSHOT_SOURCE = String.raw`
 })()
 `;
 
+const LAST_ASSISTANT_TURN_STATE_SOURCE = String.raw`
+(() => {
+  ${DOM_SNAPSHOT_HELPERS_SOURCE}
+
+  function countImageMarkers(text) {
+    const matches = text.match(/\[image-\d+\]/g);
+    return matches ? matches.length : 0;
+  }
+
+  const turns = Array.from(document.querySelectorAll('section[data-testid^="conversation-turn-"]'));
+  let lastAssistantTurn = null;
+  for (const turn of turns) {
+    if (turnRole(turn) === "assistant") lastAssistantTurn = turn;
+  }
+  if (!lastAssistantTurn) {
+    return { text: "", assetCount: 0, loadedAssetCount: 0, pendingAssetCount: 0, expectedImageMarkerCount: 0 };
+  }
+
+  const images = Array.from(lastAssistantTurn.querySelectorAll(GENERATED_IMAGE_SELECTOR));
+  let loadedAssetCount = 0;
+  let pendingAssetCount = 0;
+  for (const node of images) {
+    if (node instanceof HTMLImageElement) {
+      if (node.complete && node.naturalWidth > 0) loadedAssetCount += 1;
+      else pendingAssetCount += 1;
+    } else {
+      pendingAssetCount += 1;
+    }
+  }
+
+  const roleBlock = lastAssistantTurn.querySelector('[data-message-author-role="assistant"]');
+  const rawText = roleBlock instanceof HTMLElement
+    ? roleBlock.innerText
+    : lastAssistantTurn.innerText ?? "";
+  const text = rawText.replace(/\s+/g, " ").trim();
+
+  return {
+    text,
+    assetCount: images.length,
+    loadedAssetCount,
+    pendingAssetCount,
+    expectedImageMarkerCount: countImageMarkers(text),
+  };
+})()
+`;
+
 const ALL_MESSAGES_SNAPSHOT_SOURCE = String.raw`
 (() => {
   ${DOM_SNAPSHOT_HELPERS_SOURCE}
@@ -4138,9 +4184,16 @@ function isTransientAssistantText(ctx: IsTransientAssistantTextContext): boolean
  */
 function isTurnSettled(state: TurnSettledState): boolean {
   if (state.streaming) return false;
-  const requiredQuietMs = state.assetCount > 0 ? ASSET_SETTLE_QUIET_MS : SETTLE_QUIET_MS;
+  if (state.pendingAssetCount > 0) return false;
+  if (state.expectedImageMarkerCount > 0 && state.loadedAssetCount < state.expectedImageMarkerCount) return false;
+
+  const awaitingImages = state.expectedImageMarkerCount > 0 || state.assetCount > 0;
+  const requiredQuietMs = awaitingImages ? ASSET_SETTLE_QUIET_MS : SETTLE_QUIET_MS;
   if (state.stableForMs < requiredQuietMs) return false;
-  return state.assetCount > 0 || (state.hasText && !state.isTransientText);
+
+  if (state.loadedAssetCount > 0) return true;
+  if (state.expectedImageMarkerCount > 0) return false;
+  return state.hasText && !state.isTransientText;
 }
 
 
@@ -4241,6 +4294,12 @@ interface TurnSettledState {
   isTransientText: boolean;
   /** Count of generated image assets in the current turn. */
   assetCount: number;
+  /** Generated images in the current turn that finished loading. */
+  loadedAssetCount: number;
+  /** Generated images in the current turn still loading or incomplete. */
+  pendingAssetCount: number;
+  /** Count of `[image-N]` markers in the current turn text. */
+  expectedImageMarkerCount: number;
   /** Whether ChatGPT is still streaming the response. */
   streaming: boolean;
   /** Milliseconds the visible content has been unchanged. */
@@ -4266,16 +4325,64 @@ interface TurnSnapshot {
   text: string;
   /** Whether streaming indicator is visible. */
   streaming: boolean;
-  /** Count of generated image assets in the DOM. */
+  /** Count of generated image assets in the last assistant turn. */
   assetCount: number;
+  /** Generated images in the last assistant turn that finished loading. */
+  loadedAssetCount: number;
+  /** Generated images in the last assistant turn still loading or incomplete. */
+  pendingAssetCount: number;
+  /** Count of `[image-N]` markers in the last assistant turn text. */
+  expectedImageMarkerCount: number;
+}
+
+/** Count `[image-N]` markers in assistant text. */
+function countExpectedImageMarkers(text: string): number {
+  return (text.match(/\[image-\d+\]/g) ?? []).length;
+}
+
+/** True when two turn snapshots differ in a way that resets the settle timer. */
+function turnSnapshotChanged(previous: TurnSnapshot, next: TurnSnapshot): boolean {
+  return previous.text !== next.text
+    || previous.assetCount !== next.assetCount
+    || previous.loadedAssetCount !== next.loadedAssetCount
+    || previous.pendingAssetCount !== next.pendingAssetCount
+    || previous.expectedImageMarkerCount !== next.expectedImageMarkerCount;
+}
+
+/** In-page snapshot of the last assistant turn used for settle detection. */
+interface LastAssistantTurnState {
+  text: string;
+  assetCount: number;
+  loadedAssetCount: number;
+  pendingAssetCount: number;
+  expectedImageMarkerCount: number;
 }
 
 /** Read current assistant turn snapshot from the page. */
 async function readTurnSnapshot(ctx: ReadTurnSnapshotContext): Promise<TurnSnapshot> {
-  const text = await readNormalizedLastResponse({ page: ctx.page });
+  const turnState = await ctx.page.evaluate(LAST_ASSISTANT_TURN_STATE_SOURCE).catch(() => ({
+    text: "",
+    assetCount: 0,
+    loadedAssetCount: 0,
+    pendingAssetCount: 0,
+    expectedImageMarkerCount: 0,
+  })) as LastAssistantTurnState;
   const streaming = await isStreamingVisible({ page: ctx.page });
-  const assetCount = await ctx.page.locator(SELECTORS.generatedImage).count().catch(() => 0);
-  return { text, streaming, assetCount };
+  const text = normalizeDisplayText({
+    value: turnState.text || (await readNormalizedLastResponse({ page: ctx.page })),
+  });
+  const expectedImageMarkerCount = Math.max(
+    turnState.expectedImageMarkerCount,
+    countExpectedImageMarkers(text),
+  );
+  return {
+    text,
+    streaming,
+    assetCount: turnState.assetCount,
+    loadedAssetCount: turnState.loadedAssetCount,
+    pendingAssetCount: turnState.pendingAssetCount,
+    expectedImageMarkerCount,
+  };
 }
 
 /** Context for {@link turnSnapshotSettled}. */
@@ -4292,6 +4399,9 @@ function turnSnapshotSettled(ctx: TurnSnapshotSettledContext): boolean {
     hasText: !!ctx.snapshot.text,
     isTransientText: isTransientAssistantText({ text: ctx.snapshot.text }),
     assetCount: ctx.snapshot.assetCount,
+    loadedAssetCount: ctx.snapshot.loadedAssetCount,
+    pendingAssetCount: ctx.snapshot.pendingAssetCount,
+    expectedImageMarkerCount: ctx.snapshot.expectedImageMarkerCount,
     streaming: ctx.snapshot.streaming,
     stableForMs: ctx.stableForMs,
   });
@@ -4316,7 +4426,7 @@ async function waitForLastAssistantTextStable(ctx: WaitForLastAssistantTextStabl
   let stableSince = Date.now();
   while (Date.now() - startedAt < ctx.timeout) {
     const snapshot = await readTurnSnapshot({ page: ctx.page });
-    if (snapshot.text !== lastSnapshot.text || snapshot.assetCount !== lastSnapshot.assetCount) {
+    if (turnSnapshotChanged(lastSnapshot, snapshot)) {
       lastSnapshot = snapshot;
       stableSince = Date.now();
     }
@@ -4661,6 +4771,7 @@ export class ChatGptPage implements BrowserProvider {
 
 export {
   AttachmentDownloadError,
+  countExpectedImageMarkers,
   downloadAll,
   downloadAttachment,
   extractAllMessages,

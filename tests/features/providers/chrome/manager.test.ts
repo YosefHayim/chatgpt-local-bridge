@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { BrowserAttachError, isDebugPortListening } from "../../../../src/features/providers/chrome/browser-manager.ts";
+import {
+  BrowserAttachError,
+  isDebugPortListening,
+  profilesMatch,
+} from "../../../../src/features/providers/chrome/browser-manager.ts";
 
 describe("browser manager helpers", () => {
   it("isDebugPortListening returns false when nothing listens on the port", async () => {
@@ -10,5 +14,10 @@ describe("browser manager helpers", () => {
     const err = new BrowserAttachError("Chrome is already running");
     expect(err.name).toBe("BrowserAttachError");
     expect(err.message).toContain("already running");
+  });
+
+  it("profilesMatch compares resolved profile directories", () => {
+    expect(profilesMatch("/tmp/a", "/tmp/a")).toBe(true);
+    expect(profilesMatch("/tmp/a", "/tmp/b")).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { execFile, spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { promisify } from "node:util";
 import type { Browser, BrowserContext, Page, Response } from "playwright";
 import { chromium } from "playwright";
 import type { Conversation } from "../../domain/types.ts";
@@ -13,6 +14,53 @@ export const BRIDGE_DEBUG_PORT = 9222;
 
 const CHROME_BIN = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const CDP_URL = `http://127.0.0.1:${BRIDGE_DEBUG_PORT}`;
+const execFileAsync = promisify(execFile);
+
+/** Parse `--user-data-dir=` from the Chrome process bound to a debug port. */
+export async function getUserDataDirOnDebugPort(port: number = BRIDGE_DEBUG_PORT): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync("ps", ["ax", "-o", "command="]);
+    const needle = `--remote-debugging-port=${port}`;
+    for (const line of stdout.split("\n")) {
+      if (!line.includes(needle) || !line.includes("Google Chrome.app/Contents/MacOS/Google Chrome")) continue;
+      const match = line.match(/--user-data-dir=([^\s]+)/);
+      if (match?.[1]) return match[1];
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether two profile directories refer to the same path. */
+export function profilesMatch(expected: string, actual: string): boolean {
+  const normalize = (value: string): string => {
+    try {
+      return realpathSync(resolve(value));
+    } catch {
+      return resolve(value);
+    }
+  };
+  return normalize(expected) === normalize(actual);
+}
+
+async function waitForDebugPortClosed(port: number, maxWaitMs = 10_000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    if (!(await isDebugPortListening({ port }))) return;
+    await sleep(250);
+  }
+}
+
+/** Stop Chrome processes listening on the debug port (wrong profile recovery). */
+export async function terminateChromeOnDebugPort(port: number = BRIDGE_DEBUG_PORT): Promise<void> {
+  try {
+    await execFileAsync("pkill", ["-f", `--remote-debugging-port=${port}`]);
+  } catch {
+    /* no matching process */
+  }
+  await waitForDebugPortClosed(port);
+}
 
 /** Raised when Chrome is open but not reachable on the debug port. */
 export class BrowserAttachError extends Error {
@@ -106,10 +154,25 @@ function findProviderPage(browser: Browser, provider: BrowserProvider): { contex
 }
 
 async function navigateIfNeeded(page: Page, provider: BrowserProvider): Promise<void> {
+  wireSafeDialogHandlers(page);
   if (!page.url().includes(provider.origin)) {
     await page.goto(provider.defaultUrl, { waitUntil: "domcontentloaded" });
   }
   await page.waitForSelector(provider.composerSelector, { timeout: 30_000 }).catch(() => {});
+}
+
+/** Dismiss JS alerts/confirms without crashing when CDP races Playwright's dialog manager. */
+function wireSafeDialogHandlers(page: Page): void {
+  if ((page as Page & { __bridgeDialogWired?: boolean }).__bridgeDialogWired) return;
+  (page as Page & { __bridgeDialogWired?: boolean }).__bridgeDialogWired = true;
+  page.on("dialog", (dialog) => {
+    void dialog.dismiss().catch(() => undefined);
+  });
+}
+
+function wireSafeDialogHandlersForContext(context: BrowserContext): void {
+  for (const page of context.pages()) wireSafeDialogHandlers(page);
+  context.on("page", (page) => wireSafeDialogHandlers(page));
 }
 
 function interceptResponses(context: BrowserContext, providerId: string, conversations: Conversation[]): void {
@@ -205,6 +268,15 @@ export class BrowserManager {
   async attach(opts?: { attempts?: number; intervalMs?: number }): Promise<Page> {
     await this.resetSession();
     prepareProfileDirectories(this.repoPath, this.profileDir());
+    if (await isDebugPortListening({ port: BRIDGE_DEBUG_PORT })) {
+      const actual = await getUserDataDirOnDebugPort(BRIDGE_DEBUG_PORT);
+      const expected = this.profileDir();
+      if (actual && !profilesMatch(expected, actual)) {
+        throw new BrowserAttachError(
+          `Debug port ${BRIDGE_DEBUG_PORT} uses the wrong Chrome profile.\n  Expected: ${expected}\n  Found: ${actual}\nRun \`bridge login --repo ${this.repoPath}\` or close the other Chrome.`,
+        );
+      }
+    }
     if (await this.connectExisting(opts)) return this.markAttached();
     throw attachOnlyError();
   }
@@ -241,6 +313,7 @@ export class BrowserManager {
 
   /** Spawn Chrome or attach when the debug port is already open. */
   private async continueLaunch(): Promise<Page> {
+    await this.ensureExpectedProfileOnDebugPort();
     if (await isDebugPortListening({ port: BRIDGE_DEBUG_PORT })) {
       const connected = await this.connectExisting({ attempts: 20, intervalMs: 500 });
       if (connected) return this.getPage();
@@ -252,9 +325,25 @@ export class BrowserManager {
     return await this.runSpawnAndConnect();
   }
 
+  /** Replace a foreign Chrome on :9222, or connect when the signed-in profile is already up. */
+  private async ensureExpectedProfileOnDebugPort(): Promise<void> {
+    if (!(await isDebugPortListening({ port: BRIDGE_DEBUG_PORT }))) return;
+    const expected = this.profileDir();
+    const actual = await getUserDataDirOnDebugPort(BRIDGE_DEBUG_PORT);
+    if (actual && profilesMatch(expected, actual)) return;
+    console.error(
+      actual
+        ? `  Debug port ${BRIDGE_DEBUG_PORT} has wrong profile — replacing.\n  Expected: ${expected}\n  Found: ${actual}`
+        : `  Debug port ${BRIDGE_DEBUG_PORT} is open but profile could not be verified — replacing.`,
+    );
+    await terminateChromeOnDebugPort(BRIDGE_DEBUG_PORT);
+  }
+
   /** Spawn Chrome and wait for a CDP connection. */
   private async runSpawnAndConnect(): Promise<Page> {
-    spawnChrome(this.profileDir(), this.provider.defaultUrl);
+    const profileDir = this.profileDir();
+    console.error(`  Launching bridge Chrome profile: ${profileDir}`);
+    spawnChrome(profileDir, this.provider.defaultUrl);
     this.spawnedNew.value = true;
     console.error("  Waiting for Chrome debug port...");
     await waitForDebugPort(BRIDGE_DEBUG_PORT);
@@ -294,6 +383,7 @@ export class BrowserManager {
   /** Wire response listeners and navigate after a successful CDP attach. */
   private finalizeCdpConnection(state: CdpConnectState): void {
     this.applyCdpState(state);
+    wireSafeDialogHandlersForContext(this.context!);
     interceptResponses(this.context!, this.providerId, this.conversations);
     void navigateIfNeeded(this.page!, this.provider);
   }

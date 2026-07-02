@@ -1,14 +1,15 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { DEFAULT_CONTEXT_LIMIT, DEFAULT_MCP_PORT, DEFAULT_PERMISSION_MODE } from "@/config";
 import type { BridgeConfig } from "@/features/domain";
 import { configPath } from "@/features/store";
 
 const DEFAULT_CONFIG: BridgeConfig = {
   repoPath: process.cwd(),
   provider: "chatgpt",
-  mcpPort: 8765,
-  contextLimit: 128_000,
-  permissionMode: "auto",
+  mcpPort: DEFAULT_MCP_PORT,
+  contextLimit: DEFAULT_CONTEXT_LIMIT,
+  permissionMode: DEFAULT_PERMISSION_MODE,
 };
 
 /**

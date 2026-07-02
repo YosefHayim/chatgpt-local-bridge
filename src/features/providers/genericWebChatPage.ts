@@ -1,3 +1,4 @@
+import { DEFAULT_ASK_TIMEOUT_SECONDS } from "@/config";
 import type { ProviderConfigEntry } from "@/config";
 import type { ModelOption } from "@/features/domain";
 import type { Page } from "playwright";
@@ -71,7 +72,7 @@ export class GenericWebChatPage implements BrowserProvider {
   /** Wait for a new assistant message to appear, then for its text to stop growing. */
   async waitForResponse(page: Page, options?: number | ResponseWaitOptions): Promise<void> {
     const opts = typeof options === "number" ? { timeout: options } : (options ?? {});
-    const timeout = opts.timeout ?? 300_000;
+    const timeout = opts.timeout ?? DEFAULT_ASK_TIMEOUT_SECONDS * 1000;
     const before = opts.previousAssistantCount ?? 0;
     await page
       .waitForFunction(

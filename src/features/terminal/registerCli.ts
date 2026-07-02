@@ -1,3 +1,4 @@
+import { DEFAULT_ASK_TIMEOUT_SECONDS } from "@/config";
 import { DEFAULT_PROVIDER, PROVIDER_IDS } from "@/features/providers";
 import type { Command } from "commander";
 import { CliRunner, runDownload } from "./internal/cliRunner.ts";
@@ -37,7 +38,10 @@ function registerHeadlessCommands(program: Command, runner: CliRunner): void {
     .option("--fresh", "Start a new conversation before asking")
     .option("--conversation <idOrUrl>", "Open a ChatGPT conversation by id or URL before asking")
     .option("--model <name>", "Switch model before asking")
-    .option("--timeout <seconds>", "Max seconds to wait for the reply (default 300)")
+    .option(
+      "--timeout <seconds>",
+      `Max seconds to wait for the reply (default ${DEFAULT_ASK_TIMEOUT_SECONDS})`,
+    )
     .option("--attach <path...>", "Attach repo-relative image file(s) before asking")
     .action((...args: unknown[]) => handleAskAction(args, runner));
   program

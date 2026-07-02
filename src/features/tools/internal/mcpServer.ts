@@ -4,6 +4,7 @@ import { readFile, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
+import { DEFAULT_PERMISSION_MODE } from "@/config";
 import type { PermissionMode } from "@/features/domain";
 import { evaluateToolPermission, permissionDecisionToToolResult } from "@/features/domain";
 import type { ToolDef, ToolResult } from "@/features/domain";
@@ -758,7 +759,10 @@ async function executeToolCall(input: {
 }): Promise<ToolResult> {
   await logToolCallStart(input);
   const denied = permissionDecisionToToolResult(
-    evaluateToolPermission(input.name, input.options.getPermissionMode?.() ?? "auto"),
+    evaluateToolPermission(
+      input.name,
+      input.options.getPermissionMode?.() ?? DEFAULT_PERMISSION_MODE,
+    ),
   );
   const result = await invokeToolHandler({ ...input, denied: denied ?? undefined });
   await logToolCallEnd({ params: input, result, blocked: denied !== undefined });

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { DEFAULT_MCP_PORT, DEFAULT_PERMISSION_MODE } from "@/config";
 import { type ModelProfile, UNKNOWN_MODEL_PROFILE, findModelProfile } from "@/features/domain";
 import { type PermissionMode, normalizePermissionMode } from "@/features/domain";
 import type { BridgeConfig, Message } from "@/features/domain";
@@ -109,7 +110,6 @@ class ContextCounter {
 }
 
 /** Default MCP server port when none is configured. */
-const DEFAULT_PORT = 8765;
 
 /** Resolve the repo's current git branch, or undefined when not a git repo. */
 function currentGitBranch(repoPath: string): Promise<string | undefined> {
@@ -139,11 +139,11 @@ async function resolveEngineConfig(options: StartEngineOptions): Promise<BridgeC
   const saved = await loadConfig(repoPath);
   const config = await loadConfig(repoPath, {
     provider: options.provider ?? saved.provider ?? "chatgpt",
-    mcpPort: options.mcpPort ?? saved.mcpPort ?? DEFAULT_PORT,
+    mcpPort: options.mcpPort ?? saved.mcpPort ?? DEFAULT_MCP_PORT,
     tunnelUrl: undefined,
   });
   config.provider = normalizeProvider(config.provider);
-  config.permissionMode = normalizePermissionMode(config.permissionMode ?? "auto");
+  config.permissionMode = normalizePermissionMode(config.permissionMode ?? DEFAULT_PERMISSION_MODE);
   await saveConfig(config);
   return config;
 }
@@ -181,7 +181,7 @@ async function initEngineRuntime(
   await runHooks("SessionStart", hooksConfig.hooks).catch(() => []);
   return {
     sessionId: session.metadata.id,
-    permissionMode: normalizePermissionMode(config.permissionMode ?? "auto"),
+    permissionMode: normalizePermissionMode(config.permissionMode ?? DEFAULT_PERMISSION_MODE),
     branch,
   };
 }

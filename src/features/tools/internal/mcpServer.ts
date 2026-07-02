@@ -10,14 +10,17 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { Page } from "playwright";
 import { z } from "zod";
-import type { PermissionMode } from "../domain/permissions.ts";
-import { evaluateToolPermission, permissionDecisionToToolResult } from "../domain/permissions.ts";
-import type { ToolDef, ToolResult } from "../domain/types.ts";
-import { loadManifest } from "../providers/attachments.ts";
-import { createCheckpoint } from "../store/checkpoints.ts";
-import { appendBridgeLog } from "../store/logging.ts";
-import type { HookDefinition } from "../user-config/hooks.ts";
-import { runHooks } from "../user-config/hooks.ts";
+import type { PermissionMode } from "../../domain/permissions.ts";
+import {
+  evaluateToolPermission,
+  permissionDecisionToToolResult,
+} from "../../domain/permissions.ts";
+import type { ToolDef, ToolResult } from "../../domain/types.ts";
+import { loadManifest } from "../../providers/attachments.ts";
+import { createCheckpoint } from "../../store/checkpoints.ts";
+import { appendBridgeLog } from "../../store/logging.ts";
+import type { HookDefinition } from "../../user-config/hooks.ts";
+import { runHooks } from "../../user-config/hooks.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -528,7 +531,7 @@ const gitDiffTool: ToolDef = {
 // Attachments
 // ---------------------------------------------------------------------------
 
-const DOWNLOADER_MODULE = "../providers/chatgpt/chatgptPage.ts";
+const DOWNLOADER_MODULE = "../../providers/chatgpt/chatgptPage.ts";
 
 interface SingleDownloadResult {
   path: string;

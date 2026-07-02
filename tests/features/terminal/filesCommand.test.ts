@@ -4,7 +4,7 @@ import path from "node:path";
 import type { Page } from "playwright";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandContext } from "../../../src/features/domain/types.ts";
-import { executeCommand } from "../../../src/features/terminal/cliRunner.ts";
+import { executeCommand } from "../../../src/features/terminal/internal/cliRunner.ts";
 
 const { downloadAttachmentMock, downloadAllMock } = vi.hoisted(() => ({
   downloadAttachmentMock: vi.fn(),

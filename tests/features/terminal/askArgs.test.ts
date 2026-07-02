@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { describe, expect, it } from "vitest";
-import type { CliRunner } from "../../../src/features/terminal/cliRunner.ts";
+import type { CliRunner } from "../../../src/features/terminal/internal/cliRunner.ts";
 import { registerCliCommands } from "../../../src/features/terminal/registerCli.ts";
 
 /**

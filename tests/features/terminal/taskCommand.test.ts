@@ -3,7 +3,7 @@ import type { CommandContext } from "../../../src/features/domain/types.ts";
 import {
   buildProjectTaskPrompt,
   executeCommand,
-} from "../../../src/features/terminal/cliRunner.ts";
+} from "../../../src/features/terminal/internal/cliRunner.ts";
 import {
   getMessageRoleTheme,
   shouldAutoWrapProjectPrompt,

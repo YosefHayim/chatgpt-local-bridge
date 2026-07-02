@@ -26,4 +26,4 @@ export {
   type ParsedCommandFile,
   type ProjectInstructionFile,
   type ProjectInstructions,
-} from "./userConfig.ts";
+} from "./internal/userConfig.ts";

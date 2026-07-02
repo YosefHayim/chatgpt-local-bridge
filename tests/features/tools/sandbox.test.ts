@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { ensureInsideRepo, isAllowedTestCommand } from "../../../src/features/tools/mcpServer.ts";
+import {
+  ensureInsideRepo,
+  isAllowedTestCommand,
+} from "../../../src/features/tools/internal/mcpServer.ts";
 
 describe("ensureInsideRepo", () => {
   it("allows paths inside the repo", () => {

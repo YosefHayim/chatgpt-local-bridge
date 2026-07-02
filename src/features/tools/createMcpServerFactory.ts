@@ -1,4 +1,4 @@
-import { McpServer, type McpServerHandle, type McpServerOptions } from "./mcpServer.ts";
+import { McpServer, type McpServerHandle, type McpServerOptions } from "./internal/mcpServer.ts";
 
 /**
  * Start the MCP server with SSE and streamable HTTP transports.

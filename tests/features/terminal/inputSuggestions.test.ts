@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createCheckpoint } from "../../../src/features/store/checkpoints.ts";
 import { createSession } from "../../../src/features/store/sessionStore.ts";
-import { getAllCommands } from "../../../src/features/terminal/cliRunner.ts";
+import { getAllCommands } from "../../../src/features/terminal/internal/cliRunner.ts";
 import {
   applyInputSuggestion,
   commandSuggestionCoverage,

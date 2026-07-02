@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatDownloadLine,
   parseAttachmentIds,
-} from "../../../src/features/terminal/cliRunner.ts";
+} from "../../../src/features/terminal/internal/cliRunner.ts";
 
 describe("parseAttachmentIds", () => {
   it("returns undefined when no values are given", () => {

@@ -3,27 +3,27 @@ import {
   type ModelProfile,
   UNKNOWN_MODEL_PROFILE,
   findModelProfile,
-} from "../domain/modelsConfig.ts";
-import { type PermissionMode, normalizePermissionMode } from "../domain/permissions.ts";
-import type { BridgeConfig, Message } from "../domain/types.ts";
-import { BrowserManager } from "../providers/chrome/browserManager.ts";
-import { getBrowserProvider, normalizeProvider } from "../providers/providerRegistry.ts";
-import { resolveFileMentions } from "../store/fileResolver.ts";
-import { appendBridgeLog } from "../store/logging.ts";
-import { ensureBridgeDir, sessionsDir } from "../store/paths.ts";
-import { appendSessionEvent, createSession, updateSession } from "../store/sessionStore.ts";
-import { type McpServerHandle, type McpToolAction, startMcpServer } from "../tools/server.ts";
-import { CloudflareTunnel } from "../tunnel/cloudflareTunnel.ts";
-import { runHooks } from "../user-config/hooks.ts";
-import { loadHooksConfig } from "../user-config/hooks.ts";
+} from "../../domain/modelsConfig.ts";
+import { type PermissionMode, normalizePermissionMode } from "../../domain/permissions.ts";
+import type { BridgeConfig, Message } from "../../domain/types.ts";
+import { BrowserManager } from "../../providers/chrome/browserManager.ts";
+import { getBrowserProvider, normalizeProvider } from "../../providers/providerRegistry.ts";
+import { resolveFileMentions } from "../../store/fileResolver.ts";
+import { appendBridgeLog } from "../../store/logging.ts";
+import { ensureBridgeDir, sessionsDir } from "../../store/paths.ts";
+import { appendSessionEvent, createSession, updateSession } from "../../store/sessionStore.ts";
+import { type McpServerHandle, type McpToolAction, startMcpServer } from "../../tools/server.ts";
+import { CloudflareTunnel } from "../../tunnel/cloudflareTunnel.ts";
+import { runHooks } from "../../user-config/hooks.ts";
+import { loadHooksConfig } from "../../user-config/hooks.ts";
 import type {
   AskEngineInput,
   BuildEngineContext,
   EngineRuntimeState,
   ShutdownEngineInput,
   StartEngineOptions,
-} from "./bridgeEngineTypes.ts";
-import { loadConfig, saveConfig } from "./loadConfig.ts";
+} from "../bridgeEngineTypes.ts";
+import { loadConfig, saveConfig } from "../loadConfig.ts";
 import { Orchestrator } from "./orchestrator.ts";
 
 /** Build `<tunnelUrl>/mcp`, the URL ChatGPT's connector points at. */
@@ -492,5 +492,5 @@ export type {
   AskEngineInput,
   ShutdownEngineInput,
   StartEngineOptions,
-} from "./bridgeEngineTypes.ts";
+} from "../bridgeEngineTypes.ts";
 export { ContextCounter };

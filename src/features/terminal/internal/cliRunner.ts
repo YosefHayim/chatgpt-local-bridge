@@ -4,33 +4,33 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 
 import { render } from "ink";
 import type { Page } from "playwright";
 import React from "react";
-import { startEngine } from "../bridge/createEngineFactory.ts";
-import type { BridgeEngine } from "../bridge/createEngineFactory.ts";
-import { type FanoutResult, fanoutAsk, fanoutFailed } from "../bridge/fanoutOrchestrator.ts";
-import { findModelProfile, listModelProfiles } from "../domain/modelsConfig.ts";
-import { PERMISSION_MODES, normalizePermissionMode } from "../domain/permissions.ts";
+import { startEngine } from "../../bridge/createEngineFactory.ts";
+import type { BridgeEngine } from "../../bridge/createEngineFactory.ts";
+import { type FanoutResult, fanoutAsk, fanoutFailed } from "../../bridge/fanoutOrchestrator.ts";
+import { findModelProfile, listModelProfiles } from "../../domain/modelsConfig.ts";
+import { PERMISSION_MODES, normalizePermissionMode } from "../../domain/permissions.ts";
 import type {
   Attachment,
   CommandContext,
   CommandDef,
   ConnectorSetupResult,
   Message,
-} from "../domain/types.ts";
-import { downloadAll, extractAllMessages, loadManifest } from "../providers/attachments.ts";
-import { BRIDGE_DEBUG_PORT, BrowserManager } from "../providers/chrome/browserManager.ts";
+} from "../../domain/types.ts";
+import { downloadAll, extractAllMessages, loadManifest } from "../../providers/attachments.ts";
+import { BRIDGE_DEBUG_PORT, BrowserManager } from "../../providers/chrome/browserManager.ts";
 import {
   conversationUrlFromIdOrUrl,
   isSameChatGptConversation,
-} from "../providers/conversationUrl.ts";
+} from "../../providers/conversationUrl.ts";
 import {
   type BridgeProviderId,
   getBrowserProvider,
   normalizeProvider,
   parseProviderList,
-} from "../providers/providerRegistry.ts";
-import { listCheckpoints, restoreCheckpoint } from "../store/checkpoints.ts";
-import { bridgeLogPath } from "../store/logging.ts";
-import { exportsDir, screenshotsDir, sessionsDir } from "../store/paths.ts";
+} from "../../providers/providerRegistry.ts";
+import { listCheckpoints, restoreCheckpoint } from "../../store/checkpoints.ts";
+import { bridgeLogPath } from "../../store/logging.ts";
+import { exportsDir, screenshotsDir, sessionsDir } from "../../store/paths.ts";
 import {
   type SessionExport,
   type SessionStoreOptions,
@@ -38,23 +38,23 @@ import {
   getLatestSession,
   listSessions,
   loadSession,
-} from "../store/sessionStore.ts";
-import type { SessionMetadata } from "../store/sessionStore.ts";
-import { ensureInsideRepo, toolRegistry, trimOutput } from "../tools/server.ts";
+} from "../../store/sessionStore.ts";
+import type { SessionMetadata } from "../../store/sessionStore.ts";
+import { ensureInsideRepo, toolRegistry, trimOutput } from "../../tools/server.ts";
 import {
   loadCustomCommands,
   loadProjectInstructions,
   renderCustomCommandPrompt,
-} from "../user-config/hooks.ts";
+} from "../../user-config/hooks.ts";
 import type {
   AskOptions,
   CommonCliOptions,
   DownloadCmdOptions,
   DownloadResult,
   LoginOptions,
-} from "./cliTypes.ts";
-import { getProviderDisplayName } from "./providerLabel.ts";
-import { BridgeApp } from "./tui/App.tsx";
+} from "../cliTypes.ts";
+import { getProviderDisplayName } from "../providerLabel.ts";
+import { BridgeApp } from "../tui/App.tsx";
 
 // --- commands/commands.config.ts ---
 /** Slash-command metadata without handler functions. */
@@ -399,7 +399,7 @@ interface AttachmentDownloaderModule {
 }
 
 /** Path to the lazy-loaded downloader module. */
-const DOWNLOADER_MODULE = "../providers/chatgpt/chatgptPage.ts";
+const DOWNLOADER_MODULE = "../../providers/chatgpt/chatgptPage.ts";
 const RED = "\u001b[31m";
 const RESET = "\u001b[0m";
 

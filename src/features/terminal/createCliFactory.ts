@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { CliRunner } from "./cliRunner.ts";
+import { CliRunner } from "./internal/cliRunner.ts";
 import { registerCliCommands } from "./registerCli.ts";
 
 /** Register and run the bridge CLI (TUI + headless subcommands). */

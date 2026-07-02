@@ -14,4 +14,4 @@ export {
   type McpToolAction,
   type McpServerOptions,
   type McpServerHandle,
-} from "./mcpServer.ts";
+} from "./internal/mcpServer.ts";

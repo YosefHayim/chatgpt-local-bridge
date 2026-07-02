@@ -4,7 +4,7 @@ import type { BrowserManager } from "../providers/chrome/browserManager.ts";
 import type { McpServerHandle, McpToolAction } from "../tools/server.ts";
 import type { CloudflareTunnel } from "../tunnel/cloudflareTunnel.ts";
 import type { LoadedHooksConfig } from "../user-config/hooks.ts";
-import type { ContextCounter } from "./bridgeEngine.ts";
+import type { ContextCounter } from "./internal/bridgeEngine.ts";
 import type { Orchestrator } from "./orchestrator.ts";
 
 /**

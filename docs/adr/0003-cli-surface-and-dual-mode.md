@@ -9,7 +9,7 @@ and there was one real gap: a bare `bridge` in a non-TTY still tried to mount In
 | Verb | Purpose | Key flags |
 |------|---------|-----------|
 | `bridge` (bare) | Interactive Ink TUI | `-r/--repo`, `-p/--port`, `--provider`, `--no-browser` |
-| `bridge ask <prompt…>` | One-shot headless send-and-print | `--json --tools --fresh --conversation --model --timeout --attach` |
+| `bridge ask <prompt…>` | One-shot headless send-and-print | `--provider a,b,c --strict --json --tools --fresh --conversation --model --timeout --attach` |
 | `bridge download` | Conversation attachments (ChatGPT) | `--conversation --out --id --scan --json` |
 | `bridge sessions` | List stored sessions as JSON | — |
 | `bridge login` | One-time browser sign-in | `--repo --provider` |
@@ -31,6 +31,25 @@ In-TUI: 42 built-in slash commands via one registry (metadata arrays composed +
    stdout; every headless path ends in an explicit `process.exit`.
 4. **Slash commands and headless subcommands share the underlying functions.**
 5. Signal handlers use `process.once`.
+
+## Decision — multi-provider fan-out & two front doors, one core
+
+- **`--provider` accepts a comma list.** One id → the existing single-provider path,
+  byte-for-byte unchanged. Two or more → `fanoutAsk` (`bridge/fanoutOrchestrator.ts`):
+  each provider runs the single-ask machinery, outcomes are captured independently
+  (`{ ok, reply|error, elapsedMs }`) and printed keyed by provider — `--json` emits the
+  map. Partial-failure tolerant: exit non-zero only when **all** fail, or with
+  `--strict` when **any** fails.
+- **Two front doors over one core.** The same fan-out core backs (a) the `bridge ask`
+  CLI and (b) an **outbound** MCP `ask` tool (`agentGateway/askGatewayServer.ts`) that a
+  local agent calls to drive web chats. This is the OPPOSITE direction to the inbound
+  MCP server in `tools/` (repo tools → web model). Three MCP directions total, kept in
+  separate feature slices.
+- **Provider parsing is fail-loud** via `parseProviderList` (SSOT in `providerRegistry`):
+  an unknown id in the list exits/returns cleanly with the valid set, never silently.
+- **LIVE-VERIFY:** the concurrent multi-tab browser execution and the stdio entry that
+  serves the outbound gateway are wired at the composition root and need checking against
+  real signed-in sessions; the orchestration core, parsing, and tool logic are unit-tested.
 
 ## Audit fix-list (tracked)
 

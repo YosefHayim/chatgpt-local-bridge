@@ -24,6 +24,8 @@ export interface AskOptions extends CommonCliOptions {
   conversation?: string;
   /** Repo-relative image paths to attach in ChatGPT before sending the prompt. */
   attach?: string[];
+  /** With a multi-provider fan-out, exit non-zero if any provider fails (default: only if all fail). */
+  strict?: boolean;
 }
 
 /** Options for the non-interactive `bridge download` command. */

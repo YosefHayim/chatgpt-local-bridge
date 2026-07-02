@@ -59,5 +59,16 @@ export function getBrowserProvider(input: string | { id?: string } | undefined):
   return PROVIDERS[normalizeProvider(input)];
 }
 
+/**
+ * Parse a `--provider` value into a deduped id list. Accepts a comma-separated list
+ * (`claude,deepseek,grok`) for fan-out; empty/absent → the default provider. Each part
+ * is normalized, so an unknown provider throws {@link UnknownProviderError}.
+ */
+export function parseProviderList(spec: string | undefined): BridgeProviderId[] {
+  if (!spec?.trim()) return [DEFAULT_PROVIDER];
+  const ids = spec.split(",").map((part) => normalizeProvider(part));
+  return [...new Set(ids)];
+}
+
 export type { BrowserProvider, ResponseWaitOptions } from "./browserProviderTypes.ts";
 export { UnknownProviderError } from "./unknownProviderError.ts";

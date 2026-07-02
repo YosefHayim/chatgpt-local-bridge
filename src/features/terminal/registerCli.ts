@@ -27,7 +27,8 @@ function registerHeadlessCommands(program: Command, runner: CliRunner): void {
     .description("Send one prompt and print the reply (non-interactive)")
     .option("-r, --repo <path>", "Target repository for MCP tools")
     .option("-p, --port <number>", "MCP server port")
-    .option("--provider <name>", PROVIDER_OPTION)
+    .option("--provider <names>", `${PROVIDER_OPTION}; comma-separated for fan-out`)
+    .option("--strict", "Fan-out: exit non-zero if any provider fails (default: only if all fail)")
     .option("--json", "Emit a JSON object { sessionId, model, reply, contextTokens }")
     .option(
       "--tools",

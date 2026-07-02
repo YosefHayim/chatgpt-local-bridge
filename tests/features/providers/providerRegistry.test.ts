@@ -5,6 +5,7 @@ import {
   UnknownProviderError,
   getBrowserProvider,
   normalizeProvider,
+  parseProviderList,
 } from "../../../src/features/providers/providerRegistry.ts";
 
 describe("normalizeProvider", () => {
@@ -49,5 +50,20 @@ describe("getBrowserProvider", () => {
 describe("PROVIDER_IDS", () => {
   it("lists exactly the registered providers", () => {
     expect(PROVIDER_IDS).toEqual(["chatgpt", "gemini"]);
+  });
+});
+
+describe("parseProviderList", () => {
+  it("parses a comma-separated list and dedupes", () => {
+    expect(parseProviderList("chatgpt,gemini,chatgpt")).toEqual(["chatgpt", "gemini"]);
+  });
+
+  it("defaults to the single default provider when empty", () => {
+    expect(parseProviderList(undefined)).toEqual([DEFAULT_PROVIDER]);
+    expect(parseProviderList("  ")).toEqual([DEFAULT_PROVIDER]);
+  });
+
+  it("throws on any unknown provider in the list", () => {
+    expect(() => parseProviderList("chatgpt,claude")).toThrow(UnknownProviderError);
   });
 });

@@ -6,6 +6,7 @@ import type { Page } from "playwright";
 import React from "react";
 import { startEngine } from "../bridge/createEngineFactory.ts";
 import type { BridgeEngine } from "../bridge/createEngineFactory.ts";
+import { type FanoutResult, fanoutAsk, fanoutFailed } from "../bridge/fanoutOrchestrator.ts";
 import { findModelProfile, listModelProfiles } from "../domain/modelsConfig.ts";
 import { PERMISSION_MODES, normalizePermissionMode } from "../domain/permissions.ts";
 import type {
@@ -21,7 +22,12 @@ import {
   conversationUrlFromIdOrUrl,
   isSameChatGptConversation,
 } from "../providers/conversationUrl.ts";
-import { getBrowserProvider, normalizeProvider } from "../providers/providerRegistry.ts";
+import {
+  type BridgeProviderId,
+  getBrowserProvider,
+  normalizeProvider,
+  parseProviderList,
+} from "../providers/providerRegistry.ts";
 import { listCheckpoints, restoreCheckpoint } from "../store/checkpoints.ts";
 import { bridgeLogPath } from "../store/logging.ts";
 import { exportsDir, screenshotsDir, sessionsDir } from "../store/paths.ts";
@@ -1903,8 +1909,12 @@ interface StartAskEngineInput {
   supportsMcpConnector: boolean;
 }
 
-/** Run the full headless ask flow and exit. */
+/** Run the full headless ask flow and exit. Fans out when --provider is a comma list. */
 async function runAskFlow(input: { prompt: string; options: AskOptions }): Promise<void> {
+  const providers = resolveProviderListOrFail(input.options.provider);
+  if (providers.length > 1) {
+    return runFanoutAsk({ prompt: input.prompt, providers, options: input.options });
+  }
   redirectConsoleToStderr();
   const setup = await prepareAskRun(input.options);
   const captured = captureOrchestratorError(setup.engine);
@@ -1919,6 +1929,82 @@ async function runAskFlow(input: { prompt: string; options: AskOptions }): Promi
     orchestratorError: captured.lastError(),
     options: input.options,
   });
+}
+
+/** Parse a comma-separated --provider list, or exit cleanly on an unknown provider. */
+function resolveProviderListOrFail(spec: string | undefined): BridgeProviderId[] {
+  try {
+    return parseProviderList(spec);
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+}
+
+/**
+ * Fan one prompt out across several providers (one tab each) and print a per-provider
+ * JSON map (or a labelled block per provider), exiting per {@link fanoutFailed}.
+ *
+ * LIVE-VERIFY: each provider reuses the single-ask machinery via {@link askOneProvider};
+ * the concurrent multi-tab behaviour needs checking against real signed-in sessions.
+ */
+async function runFanoutAsk(input: {
+  prompt: string;
+  providers: BridgeProviderId[];
+  options: AskOptions;
+}): Promise<void> {
+  redirectConsoleToStderr();
+  const timeoutMs = timeoutMsFromSeconds(input.options.timeout);
+  const result = await fanoutAsk(
+    input.providers,
+    (provider) => askOneProvider(provider as BridgeProviderId, input.prompt, input.options),
+    timeoutMs ? { timeoutMs } : {},
+  );
+  writeFanoutOutput(result, input.options);
+  process.exit(fanoutFailed(result, Boolean(input.options.strict)) ? 1 : 0);
+}
+
+/** Run a single-provider ask in isolation and return its reply text (throws on failure). */
+async function askOneProvider(
+  provider: BridgeProviderId,
+  prompt: string,
+  options: AskOptions,
+): Promise<string> {
+  const browserProvider = getBrowserProvider(provider);
+  const engine = await startAskEngine({
+    options: { ...options, provider },
+    provider,
+    supportsMcpConnector: browserProvider.supportsMcpConnector,
+  });
+  try {
+    const browser = engine.browser;
+    if (!browser) {
+      throw new Error(
+        `Browser not connected. Run \`bridge login --provider ${provider}\` once to sign in.`,
+      );
+    }
+    await browserProvider.assertSignedIn(browser.getPage());
+    const captured = captureOrchestratorError(engine);
+    const reply = await runAskTurn({ engine, prompt, options: { ...options, provider } });
+    if (!reply) {
+      throw new Error(captured.lastError() ?? `${browserProvider.displayName}: no reply captured.`);
+    }
+    return reply.content;
+  } finally {
+    await engine.shutdown({ closeBrowser: false }).catch(() => {});
+  }
+}
+
+/** Print a fan-out result as keyed JSON (--json) or a labelled block per provider. */
+function writeFanoutOutput(result: FanoutResult, options: AskOptions): void {
+  if (options.json) {
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    return;
+  }
+  for (const [provider, outcome] of Object.entries(result)) {
+    const status = outcome.ok ? "ok" : "error";
+    const body = outcome.ok ? (outcome.reply ?? "") : (outcome.error ?? "");
+    process.stdout.write(`=== ${provider} (${status}, ${outcome.elapsedMs}ms) ===\n${body}\n\n`);
+  }
 }
 
 /**

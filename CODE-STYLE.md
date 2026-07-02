@@ -15,6 +15,23 @@ For framework/library best-practices, follow these skills (don't restate them he
 Formatting is owned by **Biome** (`biome.json`) — never hand-argue quotes/semis/
 width; run `pnpm format`. See `docs/adr/0002-adopt-biome-and-unified-ci.md`.
 
+## Scripts — shared `package.json` contract
+
+This repo follows the **workspace-wide script contract** — the same script _names_ across every
+sibling repo so muscle memory and CI carry across projects. SSOT + full table:
+`dufflebag/templates/mdFiles/CODE-STYLE.md → Scripts`. Only `dev`/`build`/`start` bend to the stack.
+
+- **Canonical names** — `dev` · `build` · `start` · `cli` · `test` (`vitest run`) · `test:watch` ·
+  `typecheck` (`tsc --noEmit`) · `lint` · `lint:fix` (`biome check --write ./`) · `format` ·
+  `check:ci` (`biome ci ./`) · `prepare` (`husky`) · `verify` — the one gate.
+- **`ns:action`** — variants nest under `:` (`test:watch`, `lint:fix`, `verify:push`), never a dash.
+- **One `verify` gate** — never re-split into `qa`/`quality`/`validate`.
+- **`cli`** — the interactive front door (bare = menu, `-- <sub>` = direct, non-TTY never hangs).
+
+_Aligned 2026-07-02:_ added `lint:fix`; `verify`/`verify:push`/`test:watch`/`check:ci` were already
+present. This repo keeps a lint-only `lint` = `biome lint ./` plus its extra
+`check:class-api`/`check:tsdoc`/`check:boundaries` gates, which `verify` chains after the canonical four.
+
 ## Rules
 
 Load-bearing, project-specific rules. Each is a one-liner plus a real before/after.
@@ -36,7 +53,7 @@ import { extractAllMessages, loadManifest }
 // after
 import { startEngine } from "../bridge/createEngineFactory.ts";           // ✓ factory front door
 import { loadManifest } from "../providers/attachments.ts";               // ✓ single-job door
-import { getBrowserProvider } from "../providers/createProviderFactory.ts"; // ✓
+import { getBrowserProvider } from "../providers/providerRegistry.ts";     // ✓ registry SSOT
 ```
 _Why:_ pureness, single jobs, no crossings — each file has one owner and one reason to change.
 

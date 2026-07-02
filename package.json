@@ -24,6 +24,7 @@
     "format": "biome format --write ./",
     "format:check": "biome format ./",
     "lint": "biome lint ./",
+    "lint:fix": "biome check --write ./",
     "check:ci": "biome ci ./",
     "check:class-api": "node scripts/dev/checkClassApi.mjs",
     "check:tsdoc": "node scripts/dev/checkTsdoc.mjs",

@@ -7,6 +7,8 @@ describe("bridgeLogPath", () => {
   });
 
   it("places logs under the repo's .bridge/logs", () => {
-    expect(bridgeLogPath("/repo", new Date(2026, 0, 2))).toBe("/repo/.bridge/logs/2026-01-02.jsonl");
+    expect(bridgeLogPath("/repo", new Date(2026, 0, 2))).toBe(
+      "/repo/.bridge/logs/2026-01-02.jsonl",
+    );
   });
 });

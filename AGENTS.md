@@ -1,15 +1,15 @@
 # AGENTS.md — ai-browser-bridge
 
-Terminal CLI that drives ChatGPT or Gemini in Chrome and exposes sandboxed local repo tools over MCP (ChatGPT only).
+Terminal CLI that drives ChatGPT, Gemini, Claude, DeepSeek, Grok, or Perplexity in Chrome (one provider or fanned out) and exposes sandboxed local repo tools over MCP (ChatGPT only).
 
 ## Read order (humans, no AI required)
 
 1. `src/main.ts`
-2. `src/features/terminal/create-cli.factory.ts` → `cli-runner.class.ts`
-3. `src/features/bridge/create-engine.factory.ts` → `bridge-engine.class.ts`
-4. `src/features/bridge/orchestrator.class.ts`
-5. `src/features/providers/create-provider.factory.ts` → `chatgpt-page.class.ts` or `gemini-page.class.ts`
-6. `src/features/tools/create-mcp-server.factory.ts` → `mcp-server.class.ts`
+2. `src/config/providersConfig.ts` — the provider data SSOT (ids, metadata, selectors)
+3. `src/features/terminal/createCliFactory.ts` → `internal/cliRunner.ts`
+4. `src/features/bridge/createEngineFactory.ts` → `internal/bridgeEngine.ts` → `internal/orchestrator.ts`
+5. `src/features/providers/providerRegistry.ts` → `chatgpt/chatgptPage.ts` or `genericWebChatPage.ts`
+6. `src/features/tools/server.ts` → `internal/mcpServer.ts`
 
 ## Feature ownership
 
@@ -26,25 +26,27 @@ Terminal CLI that drives ChatGPT or Gemini in Chrome and exposes sandboxed local
 | `domain` | Pure types, permissions, model catalog | (no classes) |
 | `user-config` | `~/.ai-browser-bridge/` readers | `UserConfig` |
 
-Cross-feature imports use **factories only** (`create-*.factory.ts`). Never deep-import another feature's internals.
+Cross-feature imports go through each feature's curated **`index.ts` door** via the **`@/` alias** (`@/features/<name>`) — never deep-import another feature's `internal/` or a service class directly. `src/config` is the shared data leaf (provider table + defaults) that features depend on. Enforced by `scripts/dev/checkBoundaries.mjs` (which resolves `@/`).
 
-## Class conventions
+## Conventions
 
-- One exported class per `*.class.ts` file
-- Service classes: ≤5 **public** methods (CI enforced)
-- **Exempt:** classes implementing `BrowserProvider` (fixed ~17-method contract)
-- Selectors, DOM snippets, and static config live **inside** the class file (no companion config files in provider folders)
-- Private methods: no statement/param limits; compose freely inside the class
-- JSDoc on **every** class method (public + private)
+<!-- rules digest — full guide in CODE-STYLE.md; edit there -->
 
-## Config files
-
-Static defaults only in `src/config/*.config.ts` — `const` objects/arrays, no functions, no I/O.
+- **Filenames are `camelCase.ts`** — no kebab-case, no invented dot-suffixes. Fold the old role into the name (`browserProviderTypes.ts`, `createProviderFactory.ts`, `roleThemeConfig.ts`). **TUI React components stay `PascalCase.tsx`.** Only tool-mandated dots survive (`*.test.ts`, `tsup.config.ts`, `vitest.config.ts`). Directories stay kebab-case.
+- **One service class per module**, `PascalCase`, in the feature's **`internal/`**. The feature's public surface is a curated **`index.ts` door** (named re-exports, never `export *`) at its root; cross-feature code imports it as **`@/features/<name>`**.
+- **Thin facades:** ≤5 **public** methods (CI-enforced via `check:class-api`), each delegating to module-level `function` helpers. **Exempt:** `BrowserProvider` implementers (~17-method contract) and `Orchestrator`. Private logic lives at module scope, not as private methods.
+- **TSDoc** — single line, no types in `@param`/`@returns` — on every **public** method (CI-enforced via `check:tsdoc`).
+- **Named exports only**, no default exports. `function` declarations for module helpers; arrows only inline.
+- **No `any`** — `unknown` + type guards. `strict` + `noUncheckedIndexedAccess`. One `PermissionMode` (from `PERMISSION_MODES`).
+- **Errors:** MCP handlers return `{ ok, output }`; internals throw; one catch-net per boundary. Non-critical I/O is fire-and-forget (`await x.catch(() => {})`).
+- **`src/config` is the data SSOT** — provider metadata + core selectors (`providersConfig.ts`) and tunable defaults (`defaultsConfig.ts`). `BridgeProviderId` derives from `PROVIDER_CONFIG` (`keyof`); features read config and bind behavior, never the reverse.
+- **Big provider/CLI classes are legitimate hand-edited source** — no merge/concat build, no file/function-size rule.
+- **Formatting** is Biome (`pnpm format`) — never hand-argue style.
 
 ## Verification
 
 ```bash
-pnpm typecheck && pnpm test && pnpm build && pnpm check:class-api && pnpm check:jsdoc
+pnpm verify   # biome ci + typecheck + test + build + check:class-api + check:tsdoc + check:boundaries
 ```
 
 ## Safety
@@ -52,4 +54,5 @@ pnpm typecheck && pnpm test && pnpm build && pnpm check:class-api && pnpm check:
 - All file ops through sandbox validation
 - No raw shell in MCP tools
 - Do not commit unless explicitly asked
-- TypeScript strict, no `any`
+- TypeScript strict (+ `noUncheckedIndexedAccess`), no `any`
+- No cross-feature service-class imports; reach another feature only via its `index.ts` door / `@/` alias (`check:boundaries`)

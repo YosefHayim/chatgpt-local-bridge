@@ -1,15 +1,15 @@
+import type { CommandDef } from "@/features/domain";
 import { Box, Text } from "ink";
-import type { CommandDef } from "../../domain/types.ts";
-import type { InputSuggestionGroup } from "./input-suggestions.ts";
-import type { InputMode } from "./app-types.ts";
-import { ASSIST_PANEL_HEIGHT } from "./composer-constants.ts";
 import {
   CommandFallbackMenu,
   FileMentions,
   QueuedPromptPreview,
   SuggestionMenu,
   TypingSuggestionMenu,
-} from "./composer-assist-sections.tsx";
+} from "./ComposerAssistSections.tsx";
+import type { InputMode } from "./appTypes.ts";
+import { ASSIST_PANEL_HEIGHT } from "./composerConstants.ts";
+import type { InputSuggestionGroup } from "./inputSuggestions.ts";
 
 /** Props for the composer assist panel below the input bar. */
 export type ComposerAssistPanelProps = {
@@ -43,7 +43,9 @@ export function ComposerAssistPanel(props: ComposerAssistPanelProps) {
       )}
       {flags.showFiles && <FileMentions fileMentions={props.fileMentions} />}
       {props.queuedPrompt && <QueuedPromptPreview prompt={props.queuedPrompt} />}
-      <Text dimColor>Ctrl+R history | Up/Down history | Tab suggestion | paste multiline text, Enter sends</Text>
+      <Text dimColor>
+        Ctrl+R history | Up/Down history | Tab suggestion | paste multiline text, Enter sends
+      </Text>
     </Box>
   );
 }
@@ -52,7 +54,8 @@ function assistPanelFlags(props: ComposerAssistPanelProps) {
   const suggestions = props.inputSuggestions?.suggestions ?? [];
   return {
     showCommandSuggestions: props.mode === "command-list" && suggestions.length > 0,
-    showCommandFallback: props.mode === "command-list" && suggestions.length === 0 && props.matches.length > 0,
+    showCommandFallback:
+      props.mode === "command-list" && suggestions.length === 0 && props.matches.length > 0,
     showTypingSuggestions: props.mode === "typing" && Boolean(props.inputSuggestions),
     showFiles: props.fileMentions.length > 0 && !props.inputSuggestions,
   };

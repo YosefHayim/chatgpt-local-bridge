@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { abortAndExit } from "../../../src/features/terminal/cli-runner.class.ts";
+import { abortAndExit } from "../../../src/features/terminal/internal/cliRunner.ts";
 
 /** Sentinel thrown by the fake `exit` so we can assert the call happened without ending the test process. */
 class ExitSignal extends Error {
@@ -25,10 +25,12 @@ function makeEngine(order: string[], options: { stopRejects?: boolean } = {}) {
 }
 
 /** A `(code: number) => never` that throws a sentinel so the test process keeps running. */
-const fakeExit = (order: string[]): ((code: number) => never) => (code) => {
-  order.push(`exit:${code}`);
-  throw new ExitSignal(code);
-};
+const fakeExit =
+  (order: string[]): ((code: number) => never) =>
+  (code) => {
+    order.push(`exit:${code}`);
+    throw new ExitSignal(code);
+  };
 
 describe("abortAndExit", () => {
   it("aborts, shuts down without closing the browser, then exits — in that order", async () => {

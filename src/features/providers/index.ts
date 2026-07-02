@@ -1,0 +1,11 @@
+export { downloadAll, extractAllMessages, loadManifest } from "./attachments.ts";
+export { BRIDGE_DEBUG_PORT, BrowserManager } from "./chrome/browserManager.ts";
+export { conversationUrlFromIdOrUrl, isSameChatGptConversation } from "./conversationUrl.ts";
+export {
+  DEFAULT_PROVIDER,
+  getBrowserProvider,
+  normalizeProvider,
+  parseProviderList,
+  PROVIDER_IDS,
+} from "./providerRegistry.ts";
+export type { BridgeProviderId, BrowserProvider } from "./providerRegistry.ts";

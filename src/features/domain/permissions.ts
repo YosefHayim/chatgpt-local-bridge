@@ -1,4 +1,4 @@
-import type { ToolResult } from "../domain/types.ts";
+import type { ToolResult } from "./types.ts";
 
 export const PERMISSION_MODES = ["read-only", "ask", "auto"] as const;
 export type PermissionMode = (typeof PERMISSION_MODES)[number];

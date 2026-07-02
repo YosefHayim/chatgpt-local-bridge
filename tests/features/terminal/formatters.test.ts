@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatSessionSummary, mcpConnectorUrl } from "../../../src/features/terminal/cli-runner.class.ts";
-import type { SessionMetadata } from "../../../src/features/store/session-store.ts";
+import type { SessionMetadata } from "../../../src/features/store/sessionStore.ts";
+import {
+  formatSessionSummary,
+  mcpConnectorUrl,
+} from "../../../src/features/terminal/internal/cliRunner.ts";
 
 describe("mcpConnectorUrl", () => {
   it("returns null when no tunnel is configured", () => {
@@ -14,8 +17,12 @@ describe("mcpConnectorUrl", () => {
   });
 
   it("leaves an existing /mcp or /sse endpoint untouched", () => {
-    expect(mcpConnectorUrl("https://x.trycloudflare.com/mcp")).toBe("https://x.trycloudflare.com/mcp");
-    expect(mcpConnectorUrl("https://x.trycloudflare.com/sse")).toBe("https://x.trycloudflare.com/sse");
+    expect(mcpConnectorUrl("https://x.trycloudflare.com/mcp")).toBe(
+      "https://x.trycloudflare.com/mcp",
+    );
+    expect(mcpConnectorUrl("https://x.trycloudflare.com/sse")).toBe(
+      "https://x.trycloudflare.com/sse",
+    );
   });
 });
 

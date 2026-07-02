@@ -20,15 +20,16 @@ describe("repo-local path resolution", () => {
     expect(logsDir(repo)).toBe("/tmp/example-repo/.bridge/logs");
     expect(sessionsDir(repo)).toBe("/tmp/example-repo/.bridge/sessions");
     expect(chromeProfileDir(repo)).toBe("/tmp/example-repo/.bridge/chrome-profile");
-    expect(chromeProfileDir(repo, "gemini")).toBe("/tmp/example-repo/.bridge/chrome-profile-gemini");
+    expect(chromeProfileDir(repo, "gemini")).toBe(
+      "/tmp/example-repo/.bridge/chrome-profile-gemini",
+    );
   });
 });
 
 describe("ensureBridgeDir self-ignore (the public-repo safety net)", () => {
   it("makes git ignore everything in .bridge — login cookies and transcripts included", async () => {
     const repo = await mkdtemp(join(tmpdir(), "bridge-ignore-"));
-    const git = (...args: string[]): string =>
-      execFileSync("git", args, { cwd: repo }).toString();
+    const git = (...args: string[]): string => execFileSync("git", args, { cwd: repo }).toString();
     git("init", "-q");
     git("config", "user.email", "t@t.t");
     git("config", "user.name", "t");

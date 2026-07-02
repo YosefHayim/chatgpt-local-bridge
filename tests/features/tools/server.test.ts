@@ -1,13 +1,17 @@
+import { mkdtemp } from "node:fs/promises";
 import { createServer } from "node:net";
 import type { AddressInfo } from "node:net";
-import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { describe, expect, it } from "vitest";
-import { isSseEndpointPath, isStreamableHttpEndpointPath, startMcpServer } from "../../../src/features/tools/server.ts";
+import {
+  isSseEndpointPath,
+  isStreamableHttpEndpointPath,
+  startMcpServer,
+} from "../../../src/features/tools/server.ts";
 
 describe("MCP server", () => {
   it("accepts common SSE endpoint paths", () => {
@@ -33,13 +37,9 @@ describe("MCP server", () => {
     try {
       await client.connect(transport);
       const tools = await client.listTools();
-      expect(tools.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
-        "grep_code",
-        "read_file",
-        "apply_patch",
-        "run_tests",
-        "git_diff",
-      ]));
+      expect(tools.tools.map((tool) => tool.name)).toEqual(
+        expect.arrayContaining(["grep_code", "read_file", "apply_patch", "run_tests", "git_diff"]),
+      );
     } finally {
       await client.close();
       server.close();
@@ -80,13 +80,9 @@ describe("MCP server", () => {
     try {
       await client.connect(new StreamableHTTPClientTransport(new URL("/mcp", `${server.url}/`)));
       const tools = await client.listTools();
-      expect(tools.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
-        "grep_code",
-        "read_file",
-        "apply_patch",
-        "run_tests",
-        "git_diff",
-      ]));
+      expect(tools.tools.map((tool) => tool.name)).toEqual(
+        expect.arrayContaining(["grep_code", "read_file", "apply_patch", "run_tests", "git_diff"]),
+      );
       expect(tools.tools.find((tool) => tool.name === "read_file")?.annotations).toMatchObject({
         readOnlyHint: true,
       });

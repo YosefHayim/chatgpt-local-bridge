@@ -1,6 +1,6 @@
+import type { Message } from "@/features/domain";
 import { Box, Text } from "ink";
-import type { Message } from "../../domain/types.ts";
-import { getMessageRoleTheme } from "./role-theme.config.ts";
+import { getMessageRoleTheme } from "./roleThemeConfig.ts";
 
 /** Props for the scrollable message pane. */
 export type MessagePaneProps = {
@@ -34,9 +34,10 @@ function MessageRow(props: MessageRowProps) {
       <Text>
         <Text color={theme.color} backgroundColor={theme.backgroundColor} bold>
           {theme.prefix} {theme.label}:{" "}
+        </Text>{" "}
+        <Text color={theme.color} backgroundColor={theme.backgroundColor}>
+          {preview}
         </Text>
-        {" "}
-        <Text color={theme.color} backgroundColor={theme.backgroundColor}>{preview}</Text>
       </Text>
       {renderToolCalls(props.message)}
     </Box>

@@ -25,12 +25,12 @@ function stubDocument(element: { innerText?: string } | null): void {
 /** Page stub whose `evaluate` runs the passed in-page function for real. */
 function fakePage(): Page {
   return {
-    evaluate: async <Result,>(fn: () => Result): Promise<Result> => fn(),
+    evaluate: async <Result>(fn: () => Result): Promise<Result> => fn(),
   } as unknown as Page;
 }
 
 afterEach(() => {
-  delete (globalThis as { document?: unknown }).document;
+  (globalThis as { document?: unknown }).document = undefined;
 });
 
 describe("readComposerText", () => {

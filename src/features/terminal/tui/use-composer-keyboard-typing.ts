@@ -1,7 +1,7 @@
 import { findReverseHistoryMatch } from "./composer-history.ts";
+import type { ComposerKeyboardOptions } from "./composer-keyboard-types.ts";
 import { applyInputSuggestion } from "./input-suggestions.ts";
 import type { ComposerState } from "./use-composer-state.ts";
-import type { ComposerKeyboardOptions } from "./composer-keyboard-types.ts";
 
 export function handleGlobalShortcuts(options: {
   char: string;
@@ -30,10 +30,12 @@ function applyHistoryMatch(state: ComposerState) {
   state.setStatus(`History match: ${match}`);
 }
 
-export function handleTypingKeys(options: ComposerKeyboardOptions & {
-  char: string;
-  key: { upArrow?: boolean; downArrow?: boolean; tab?: boolean };
-}) {
+export function handleTypingKeys(
+  options: ComposerKeyboardOptions & {
+    char: string;
+    key: { upArrow?: boolean; downArrow?: boolean; tab?: boolean };
+  },
+) {
   if (options.key.upArrow) {
     options.state.setInput(options.state.refs.history.current.previous(options.state.input));
     return;
@@ -49,5 +51,5 @@ function completeTypingTab(state: ComposerState) {
   if (!state.inputSuggestions?.suggestions.length) return;
   const nextInput = applyInputSuggestion(state.input, state.inputSuggestions);
   state.setInput(nextInput);
-  state.setStatus(`Completed ${state.inputSuggestions.suggestions[0].label}`);
+  state.setStatus(`Completed ${state.inputSuggestions.suggestions[0]?.label ?? ""}`);
 }

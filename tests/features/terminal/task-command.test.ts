@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CommandContext } from "../../../src/features/domain/types.ts";
-import { buildProjectTaskPrompt, executeCommand } from "../../../src/features/terminal/cli-runner.class.ts";
-import { getMessageRoleTheme, shouldAutoWrapProjectPrompt } from "../../../src/features/terminal/tui/App.tsx";
+import {
+  buildProjectTaskPrompt,
+  executeCommand,
+} from "../../../src/features/terminal/cli-runner.class.ts";
+import {
+  getMessageRoleTheme,
+  shouldAutoWrapProjectPrompt,
+} from "../../../src/features/terminal/tui/App.tsx";
 
 function createCommandContext(onSend: (content: string) => void): CommandContext {
   return {
@@ -178,7 +184,9 @@ describe("task command", () => {
   });
 
   it("detects natural project requests for MCP-first wrapping", () => {
-    expect(shouldAutoWrapProjectPrompt("hi there can u check the structure of my project local")).toBe(true);
+    expect(
+      shouldAutoWrapProjectPrompt("hi there can u check the structure of my project local"),
+    ).toBe(true);
     expect(shouldAutoWrapProjectPrompt("refactor @src/terminal/tui/App.tsx")).toBe(true);
     expect(shouldAutoWrapProjectPrompt("hi there how are you")).toBe(false);
   });

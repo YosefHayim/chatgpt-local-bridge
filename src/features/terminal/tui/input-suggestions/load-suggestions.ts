@@ -24,7 +24,11 @@ async function loadSlashSuggestions(input: {
   const slash = parseSlashInput(input.input);
   if (!slash) return null;
   if (!input.input.includes(" ")) {
-    return commandNameSuggestions({ partial: slash.command, commands: input.options.commands, options: input.options });
+    return commandNameSuggestions({
+      partial: slash.command,
+      commands: input.options.commands,
+      options: input.options,
+    });
   }
   return commandArgumentSuggestions(slash, input.options);
 }
@@ -37,7 +41,10 @@ interface FileMentionMatch {
 }
 
 /** Build a suggestion group from active @ file mention matches. */
-function fileMentionSuggestionGroup(input: { input: string; fileMention: FileMentionMatch }): InputSuggestionGroup {
+function fileMentionSuggestionGroup(input: {
+  input: string;
+  fileMention: FileMentionMatch;
+}): InputSuggestionGroup {
   return {
     title: "Files and folders",
     hint: "Tab inserts the first match. Continue typing to narrow.",
@@ -46,7 +53,7 @@ function fileMentionSuggestionGroup(input: { input: string; fileMention: FileMen
     suggestions: input.fileMention.matches.map((match) => ({
       value: `@${match.path}`,
       label: `@${match.path}`,
-      kind: match.isDirectory ? "folder" as const : "file" as const,
+      kind: match.isDirectory ? ("folder" as const) : ("file" as const),
     })),
   };
 }

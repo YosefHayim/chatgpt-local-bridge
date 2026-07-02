@@ -1,14 +1,21 @@
 name: CI
 
+# Local gate composing single-purpose reusable workflows (biome / typecheck / test
+# / build / checks / report-failure) via `./` refs — each is `on: workflow_call`.
+# Adapted from dufflebag's templates (ADR 0002).
+#
+# - `CI Gate` is the single aggregated status check: require it in branch protection
+#   so a red leg blocks merges.
+# - `report-failure` opens/updates a ci-failure issue when master goes red (never for
+#   PRs).
+# - E2E is opt-in: this repo drives Playwright but its tests use fakes; wire e2e.yml
+#   in once a `test:e2e` script exists.
+
 on:
   push:
-    branches:
-      - master
-      - main
+    branches: [master]
   pull_request:
-    branches:
-      - master
-      - main
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -19,42 +26,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  biome:
+    uses: ./.github/workflows/biome.yml
+
+  typecheck:
+    uses: ./.github/workflows/typecheck.yml
+
   test:
-    name: Typecheck, test, and build
+    uses: ./.github/workflows/test.yml
+
+  build:
+    uses: ./.github/workflows/build.yml
+
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  # e2e:
+  #   uses: ./.github/workflows/e2e.yml
+
+  gate:
+    name: CI Gate
+    needs: [biome, typecheck, test, build, checks]
+    if: always()
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Require every gate to pass
+        run: |
+          echo "biome=${{ needs.biome.result }} typecheck=${{ needs.typecheck.result }} test=${{ needs.test.result }} build=${{ needs.build.result }} checks=${{ needs.checks.result }}"
+          test "${{ needs.biome.result }}" = "success" \
+            && test "${{ needs.typecheck.result }}" = "success" \
+            && test "${{ needs.test.result }}" = "success" \
+            && test "${{ needs.build.result }}" = "success" \
+            && test "${{ needs.checks.result }}" = "success"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.14.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck
-        run: pnpm exec tsc --noEmit
-
-      - name: Test
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
-
-      - name: CLI smoke
-        run: node dist/bridge.js --help
-
-      - name: Package dry run
-        run: npm pack --dry-run
-
-      - name: Check diff hygiene
-        run: git diff --check
+  report-failure:
+    name: Open issue on master failure
+    needs: [biome, typecheck, test, build, checks]
+    if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    uses: ./.github/workflows/report-failure.yml

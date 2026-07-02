@@ -1,5 +1,5 @@
 import type { ModelProfile } from "./model-profile.types.ts";
-import { OPENAI_GPT_4_1_URL, OPENAI_GPT_4O_URL } from "./model-urls.ts";
+import { OPENAI_GPT_4O_URL, OPENAI_GPT_4_1_URL } from "./model-urls.ts";
 import { OPENAI_GPT5_MODEL_PROFILES } from "./openai-gpt5.profiles.ts";
 
 /** GPT-4.x and o-series OpenAI model profiles. */

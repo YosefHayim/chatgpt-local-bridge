@@ -3,16 +3,19 @@ import os from "node:os";
 import path from "node:path";
 import type { Page } from "playwright";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { executeCommand } from "../src/features/terminal/cli-runner.class.ts";
-import type { CommandContext } from "../src/features/domain/types.ts";
+import type { CommandContext } from "../../../src/features/domain/types.ts";
+import { executeCommand } from "../../../src/features/terminal/cli-runner.class.ts";
 
 const { downloadAttachmentMock, downloadAllMock } = vi.hoisted(() => ({
   downloadAttachmentMock: vi.fn(),
   downloadAllMock: vi.fn(),
 }));
 
-vi.mock("../src/features/providers/chatgpt/chatgpt-page.class.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/features/providers/chatgpt/chatgpt-page.class.ts")>();
+vi.mock("../../../src/features/providers/chatgpt/chatgpt-page.class.ts", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/features/providers/chatgpt/chatgpt-page.class.ts")
+    >();
   return {
     ...actual,
     downloadAttachment: downloadAttachmentMock,
@@ -65,7 +68,12 @@ describe("/files command", () => {
 
     await executeCommand("/files get file-1", commandContext("conv-1"));
 
-    expect(downloadAttachmentMock).toHaveBeenCalledWith(expect.any(Object), "conv-1", "file-1", undefined);
+    expect(downloadAttachmentMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      "conv-1",
+      "file-1",
+      undefined,
+    );
     expect(logs.lines).toEqual(["/tmp/report.csv"]);
     logs.restore();
   });
@@ -91,40 +99,48 @@ describe("/files command", () => {
 
     await executeCommand("/files get all --out /tmp/out", commandContext("conv-1"));
 
-    expect(downloadAllMock).toHaveBeenCalledWith(expect.any(Object), "conv-1", { outDir: "/tmp/out" });
+    expect(downloadAllMock).toHaveBeenCalledWith(expect.any(Object), "conv-1", {
+      outDir: "/tmp/out",
+    });
     expect(logs.lines[0]).toBe("Downloaded 2/2 attachments.");
     logs.restore();
   });
 });
 
 async function mkdirTemp(): Promise<string> {
-  return await import("node:fs/promises").then(({ mkdtemp }) => mkdtemp(path.join(os.tmpdir(), "bridge-files-command-")));
+  return await import("node:fs/promises").then(({ mkdtemp }) =>
+    mkdtemp(path.join(os.tmpdir(), "bridge-files-command-")),
+  );
 }
 
 async function writeManifest(conversationId: string): Promise<void> {
   const dir = path.join(tempDir, "downloads", conversationId);
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, "manifest.json"), JSON.stringify({
-    conversationId,
-    attachments: [
-      {
-        id: "file-1",
-        kind: "file",
-        url: "blob:https://chatgpt.test/report",
-        filename: "report.csv",
-        messageIndex: 2,
-        createdAt: "2026-05-01T00:00:00.000Z",
-      },
-      {
-        id: "image-1",
-        kind: "image",
-        url: "https://example.test/chart.png",
-        filename: "chart.png",
-        messageIndex: 3,
-        createdAt: "2026-05-01T00:00:00.000Z",
-      },
-    ],
-  }), "utf8");
+  await writeFile(
+    path.join(dir, "manifest.json"),
+    JSON.stringify({
+      conversationId,
+      attachments: [
+        {
+          id: "file-1",
+          kind: "file",
+          url: "blob:https://chatgpt.test/report",
+          filename: "report.csv",
+          messageIndex: 2,
+          createdAt: "2026-05-01T00:00:00.000Z",
+        },
+        {
+          id: "image-1",
+          kind: "image",
+          url: "https://example.test/chart.png",
+          filename: "chart.png",
+          messageIndex: 3,
+          createdAt: "2026-05-01T00:00:00.000Z",
+        },
+      ],
+    }),
+    "utf8",
+  );
 }
 
 function commandContext(conversationId: string): CommandContext {

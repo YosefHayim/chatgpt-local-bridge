@@ -1,54 +1,42 @@
-# chatgpt-local-bridge
+# CONTEXT.md — ai-browser-bridge
 
-The shared language for a terminal tool that drives a real ChatGPT browser
-conversation while exposing a narrow, validated set of local repo tools to it.
+Orientation: what this is, its moving parts, and how they fit. For the words, see
+`LANGUAGE.md`; for purpose and direction, `PROJECT.md`; for how code is written,
+`CODE-STYLE.md`; for how to work in the repo, `AGENTS.md`.
 
-## Language
+## What it is
 
-**Bridge**:
-The running tool that connects one terminal session to one ChatGPT browser
-conversation and brokers local tool calls between them.
+A terminal tool that drives a real ChatGPT or Gemini browser Conversation and, for
+ChatGPT, exposes a narrow set of sandboxed local repo Tools to it over MCP — no raw
+shell. You stay in one terminal workflow; the provider keeps its real UI.
 
-**Conversation**:
-The actual ChatGPT browser thread — its model, messages, edits, and
-regenerations. Owned by ChatGPT, driven (not replaced) by the Bridge.
-_Avoid_: chat, thread, session.
+## The four actors
 
-**Session**:
-The Bridge's own local record of one terminal-driven run (its metadata and
-event log). A Session _describes_ a Conversation; it is not the Conversation.
-_Avoid_: conversation, chat, history.
+```text
+ terminal (you)
+      │  Ink / React CLI
+      ▼
+ orchestrator ───────────────┬─────────────────────────────┐
+      │  Playwright + CDP     │                 MCP server   │
+      ▼                       │                (MCP SDK)     ▼
+ ChatGPT / Gemini browser UI  │                    local repo Tools
+      ▲                       │                 (grep/read/patch/test/diff)
+      │                       ▼                              │
+      └────── Cloudflare Tunnel (cloudflared) ◄──────────────┘
+```
 
-**Login**:
-The signed-in ChatGPT browser identity (the persisted Chrome profile). The thing
-that must never leak. Distinct from a Session.
-_Avoid_: session, account.
+| Actor | Tech | Job |
+|-------|------|-----|
+| **CLI** | Ink / React (`terminal/`) | Terminal UI + scriptable headless commands; one dual-mode front door. |
+| **Browser** | Playwright + CDP (`providers/`) | Drives the real ChatGPT/Gemini tab behind the fixed `BrowserProvider` contract; captures responses. |
+| **MCP server** | MCP SDK + Zod (`tools/`) | Exposes the local repo Tools to ChatGPT as schema-validated, Sandbox-confined handlers. |
+| **Tunnel** | `cloudflared` (`tunnel/`) | Gives the local MCP server a temporary public HTTPS URL ChatGPT's connector can reach (ChatGPT only). |
 
-**Tunnel**:
-The HTTPS channel that lets ChatGPT reach the local MCP server when it cannot
-reach localhost. Implemented with Cloudflare Tunnel (`cloudflared`,
-`*.trycloudflare.com`).
-_Avoid_: ngrok, proxy.
+Supporting features: `bridge/` (engine + orchestrator that wire it together),
+`store/` (Sessions, checkpoints, logs), `domain/` (pure types, permissions, model
+catalog), `user-config/` (`~/.ai-browser-bridge/` readers).
 
-**Tool**:
-A single local capability exposed to ChatGPT over MCP — grep, read, patch,
-tests, diff.
-_Avoid_: command, function.
-
-**Sandbox**:
-The validation boundary that confines every Tool's file access to the Target
-repo. A request outside it fails loudly.
-_Avoid_: jail, scope.
-
-**Checkpoint**:
-A file snapshot captured around an MCP patch so the change can be rolled back.
-
-**Target repo**:
-The repository the Tools operate inside (`repoPath`, default `process.cwd()`).
-Also where repo-local Bridge state lives, under `.bridge/`.
-_Avoid_: workspace, project root.
-
-## Relationships
+## How the pieces relate
 
 - A **Bridge** drives one **Conversation** and records one **Session**.
 - A **Session** belongs to exactly one **Target repo**.
@@ -56,15 +44,17 @@ _Avoid_: workspace, project root.
 - A **Tunnel** exposes the MCP server hosting the **Tools** to the **Conversation**.
 - The **Login** is shared across all Conversations; a **Session** is per-run.
 
-## Example dialogue
+## Where state lives
 
-> **Dev:** "When I `/resume` a **Session**, does it reopen the same ChatGPT **Conversation**?"
-> **Domain expert:** "It reopens the **Conversation** in the browser and replays the **Session**'s event log in the terminal. The **Session** is our record; the **Conversation** is ChatGPT's."
+All Bridge state for a project is written **inside that project**, under
+`<repo>/.bridge/` — `config.json`, the signed-in `chrome-profile/`, `sessions/`,
+`logs/`, `checkpoints/`, `exports/`, `screenshots/`. On first use the Bridge writes
+`.bridge/.gitignore` containing a single `*`, so the whole directory self-ignores
+and never enters git (see `docs/adr/0001-repo-local-state.md`). User-global config
+(custom commands, hooks) lives in `~/.ai-browser-bridge/`.
 
-## Flagged ambiguities
+## Where to start reading
 
-- "ngrok" was used to mean the **Tunnel** — resolved: the Tunnel is Cloudflare
-  Tunnel (`cloudflared`); ngrok is not used anywhere.
-- "session" was overloaded between the Bridge **Session** (a local run record)
-  and the **Login** (the persisted ChatGPT browser identity) — resolved: these
-  are distinct concepts.
+`src/main.ts` → `terminal/create-cli.factory.ts` → `bridge/create-engine.factory.ts`
+→ `bridge/orchestrator.class.ts` → `providers/create-provider.factory.ts` →
+`tools/create-mcp-server.factory.ts`. (Full read-order in `AGENTS.md`.)

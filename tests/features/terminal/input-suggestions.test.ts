@@ -2,14 +2,14 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { createCheckpoint } from "../../../src/features/store/checkpoints.ts";
+import { createSession } from "../../../src/features/store/session-store.ts";
 import { getAllCommands } from "../../../src/features/terminal/cli-runner.class.ts";
 import {
   applyInputSuggestion,
   commandSuggestionCoverage,
   loadInputSuggestions,
 } from "../../../src/features/terminal/tui/input-suggestions.ts";
-import { createSession } from "../../../src/features/store/session-store.ts";
-import { createCheckpoint } from "../../../src/features/store/checkpoints.ts";
 
 async function createRepo(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "bridge-suggestions-repo-"));
@@ -33,8 +33,12 @@ describe("loadInputSuggestions", () => {
     });
 
     expect(group?.title).toBe("Files and folders");
-    expect(group?.suggestions.map((suggestion) => suggestion.label)).toEqual(["@src/features/terminal/"]);
-    expect(group ? applyInputSuggestion("inspect @src/features/t", group) : "").toBe("inspect @src/features/terminal/");
+    expect(group?.suggestions.map((suggestion) => suggestion.label)).toEqual([
+      "@src/features/terminal/",
+    ]);
+    expect(group ? applyInputSuggestion("inspect @src/features/t", group) : "").toBe(
+      "inspect @src/features/terminal/",
+    );
   });
 
   it("shows permission modes for /permissions", async () => {
@@ -47,19 +51,16 @@ describe("loadInputSuggestions", () => {
 
     expect(group?.title).toBe("Permissions");
     expect(group?.suggestions.map((suggestion) => suggestion.value)).toEqual(["read-only"]);
-    expect(group ? applyInputSuggestion("/permissions r", group) : "").toBe("/permissions read-only");
+    expect(group ? applyInputSuggestion("/permissions r", group) : "").toBe(
+      "/permissions read-only",
+    );
   });
 
   it("shows custom command names in the slash command menu", async () => {
     const repoRoot = await createRepo();
     await writeFile(
       join(repoRoot, ".bridge", "commands", "audit.md"),
-      [
-        "---",
-        "description: Inspect the current project",
-        "---",
-        "Audit $ARGUMENTS",
-      ].join("\n"),
+      ["---", "description: Inspect the current project", "---", "Audit $ARGUMENTS"].join("\n"),
     );
 
     const group = await loadInputSuggestions("/a", {
@@ -68,20 +69,26 @@ describe("loadInputSuggestions", () => {
       customCommandsHomeDir: join(repoRoot, "empty-home"),
     });
 
-    expect(group?.suggestions.map((suggestion) => suggestion.label)).toEqual(["/attach-image", "/audit"]);
+    expect(group?.suggestions.map((suggestion) => suggestion.label)).toEqual([
+      "/attach-image",
+      "/audit",
+    ]);
     expect(group ? applyInputSuggestion("/a", group, 1) : "").toBe("/audit ");
   });
 
   it("shows local sessions for session-backed commands", async () => {
     const repoRoot = await createRepo();
     const sessionBase = await mkdtemp(join(tmpdir(), "bridge-suggestions-sessions-"));
-    await createSession({
-      id: "session-a",
-      repoPath: repoRoot,
-      model: "GPT-5.2",
-      contextLimit: 128_000,
-      startedAt: "2026-04-28T10:00:00.000Z",
-    }, { baseDir: sessionBase });
+    await createSession(
+      {
+        id: "session-a",
+        repoPath: repoRoot,
+        model: "GPT-5.2",
+        contextLimit: 128_000,
+        startedAt: "2026-04-28T10:00:00.000Z",
+      },
+      { baseDir: sessionBase },
+    );
 
     const group = await loadInputSuggestions("/resume ", {
       repoRoot,
@@ -121,13 +128,16 @@ describe("loadInputSuggestions", () => {
   it("moves to path/output arguments after a selected restore or export target", async () => {
     const repoRoot = await createRepo();
     const sessionBase = await mkdtemp(join(tmpdir(), "bridge-suggestions-sessions-"));
-    await createSession({
-      id: "session-a",
-      repoPath: repoRoot,
-      model: "GPT-5.2",
-      contextLimit: 128_000,
-      startedAt: "2026-04-28T10:00:00.000Z",
-    }, { baseDir: sessionBase });
+    await createSession(
+      {
+        id: "session-a",
+        repoPath: repoRoot,
+        model: "GPT-5.2",
+        contextLimit: 128_000,
+        startedAt: "2026-04-28T10:00:00.000Z",
+      },
+      { baseDir: sessionBase },
+    );
 
     const restore = await loadInputSuggestions("/restore checkpoint-a R", {
       repoRoot,

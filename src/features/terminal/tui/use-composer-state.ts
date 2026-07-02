@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState, type MutableRefObject } from "react";
-import { getAllCommands, matchCommands } from "../cli-runner.class.ts";
+import { type MutableRefObject, useMemo, useRef, useState } from "react";
 import { extractFileMentions } from "../../store/file-resolver.ts";
-import type { InputSuggestionGroup } from "./input-suggestions.ts";
+import { getAllCommands, matchCommands } from "../cli-runner.class.ts";
 import type { InputMode } from "./app-types.ts";
 import { PromptHistory } from "./composer-history.ts";
+import type { InputSuggestionGroup } from "./input-suggestions.ts";
 
 /** Mutable composer refs shared across keyboard and send handlers. */
 export type ComposerRefs = {
@@ -12,7 +12,7 @@ export type ComposerRefs = {
   stopShortcutRunning: MutableRefObject<boolean>;
   history: MutableRefObject<PromptHistory>;
   sendInProgress: MutableRefObject<boolean>;
-  queuedPromptRef: MutableRefObject<string | null>;
+  queuedPromptRef: MutableRefObject<string[]>;
 };
 
 /** Base composer state and derived lists. */
@@ -62,7 +62,15 @@ function useComposerPanelFields() {
   const [inputSuggestions, setInputSuggestions] = useState<InputSuggestionGroup | null>(null);
   const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
   const [, forceRender] = useState(0);
-  return { status, setStatus, inputSuggestions, setInputSuggestions, queuedPrompt, setQueuedPrompt, forceRender };
+  return {
+    status,
+    setStatus,
+    inputSuggestions,
+    setInputSuggestions,
+    queuedPrompt,
+    setQueuedPrompt,
+    forceRender,
+  };
 }
 
 function useComposerDerived(input: string) {
@@ -79,11 +87,14 @@ function useComposerRefs(): ComposerRefs {
     stopShortcutRunning: useRef(false),
     history: useRef(new PromptHistory()),
     sendInProgress: useRef(false),
-    queuedPromptRef: useRef(null),
+    queuedPromptRef: useRef<string[]>([]),
   };
 }
 
-function matchCommandInput(options: { input: string; allCommands: ReturnType<typeof getAllCommands> }) {
+function matchCommandInput(options: {
+  input: string;
+  allCommands: ReturnType<typeof getAllCommands>;
+}) {
   if (!options.input.startsWith("/")) return [];
   const partial = options.input.slice(1).split(" ")[0];
   if (!partial) return options.allCommands;

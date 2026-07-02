@@ -3,10 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  type CustomCommand,
   loadCustomCommands,
   parseCustomCommandFile,
   renderCustomCommandPrompt,
-  type CustomCommand,
 } from "../../../src/features/user-config/hooks.ts";
 
 async function tempDir(): Promise<string> {
@@ -25,8 +25,13 @@ describe("custom commands", () => {
 
     const commands = await loadCustomCommands({ repoRoot, homeDir });
 
-    expect(commands.map((command) => `${command.source}:${command.name}`)).toEqual(["user:commit", "project:review"]);
-    expect(commands.find((command) => command.name === "review")?.promptTemplate).toBe("Review $ARGUMENTS");
+    expect(commands.map((command) => `${command.source}:${command.name}`)).toEqual([
+      "user:commit",
+      "project:review",
+    ]);
+    expect(commands.find((command) => command.name === "review")?.promptTemplate).toBe(
+      "Review $ARGUMENTS",
+    );
   });
 
   it("parses dependency-free YAML-like frontmatter", () => {

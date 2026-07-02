@@ -11,7 +11,9 @@ interface WithFilteredSuggestionsParams {
 }
 
 /** Filter suggestions by query and apply the limit. */
-export function withFilteredSuggestions(params: WithFilteredSuggestionsParams): InputSuggestionGroup {
+export function withFilteredSuggestions(
+  params: WithFilteredSuggestionsParams,
+): InputSuggestionGroup {
   const normalizedQuery = params.query.toLowerCase();
   const limit = params.limit ?? DEFAULT_SUGGESTION_LIMIT;
   return {
@@ -23,9 +25,14 @@ export function withFilteredSuggestions(params: WithFilteredSuggestionsParams): 
 }
 
 /** Apply a selected suggestion to the input string. */
-export function applyInputSuggestion(input: string, group: InputSuggestionGroup, index = 0): string {
+export function applyInputSuggestion(
+  input: string,
+  group: InputSuggestionGroup,
+  index = 0,
+): string {
   const suggestion = group.suggestions[index];
-  if (!suggestion || group.replacementStart === undefined || group.replacementEnd === undefined) return input;
+  if (!suggestion || group.replacementStart === undefined || group.replacementEnd === undefined)
+    return input;
   return `${input.slice(0, group.replacementStart)}${suggestion.value}${input.slice(group.replacementEnd)}`;
 }
 

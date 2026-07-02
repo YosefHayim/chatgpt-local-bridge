@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { estimateTokens, ContextCounter } from "../../../src/features/bridge/bridge-engine.class.ts";
+import { describe, expect, it } from "vitest";
+import {
+  ContextCounter,
+  estimateTokens,
+} from "../../../src/features/bridge/bridge-engine.class.ts";
 
 describe("estimateTokens", () => {
   it("estimates tokens from string length", () => {

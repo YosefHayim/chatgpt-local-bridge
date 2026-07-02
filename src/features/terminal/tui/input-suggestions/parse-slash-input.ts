@@ -5,7 +5,11 @@ export function parseSlashInput(input: string): ParsedSlashInput | null {
   if (!input.startsWith("/")) return null;
   const spaceIndex = input.indexOf(" ");
   if (spaceIndex === -1) return { command: input.slice(1), args: "", argsStart: input.length };
-  return { command: input.slice(1, spaceIndex), args: input.slice(spaceIndex + 1), argsStart: spaceIndex + 1 };
+  return {
+    command: input.slice(1, spaceIndex),
+    args: input.slice(spaceIndex + 1),
+    argsStart: spaceIndex + 1,
+  };
 }
 
 /** Extract the active argument token at the end of slash command args. */

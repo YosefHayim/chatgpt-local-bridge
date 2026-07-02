@@ -1,10 +1,10 @@
 import { useCallback, useMemo } from "react";
-import { executeCommand } from "../cli-runner.class.ts";
 import type { CommandContext } from "../../domain/types.ts";
+import { executeCommand } from "../cli-runner.class.ts";
 import type { PromptSendResult } from "./app-types.ts";
 import type { AppProps } from "./app-types.ts";
-import type { ComposerState } from "./use-composer-state.ts";
 import { projectAwarePrompt } from "./project-aware-prompt.ts";
+import type { ComposerState } from "./use-composer-state.ts";
 
 /** Options for slash command execution. */
 export type ComposerCommandOptions = {
@@ -43,15 +43,18 @@ function useCommandContext(props: AppProps): CommandContext {
 
 function useRunCommand(options: ComposerCommandOptions & { ctx: CommandContext }) {
   const { state, enqueueOrSendPrompt, ctx } = options;
-  return useCallback(async (cmd: string) => {
-    try {
-      await executeCommandOrPrompt({ cmd, ctx, state, enqueueOrSendPrompt });
-    } catch (err) {
-      reportCommandError({ state, err });
-    } finally {
-      state.forceRender((value) => value + 1);
-    }
-  }, [ctx, enqueueOrSendPrompt, state]);
+  return useCallback(
+    async (cmd: string) => {
+      try {
+        await executeCommandOrPrompt({ cmd, ctx, state, enqueueOrSendPrompt });
+      } catch (err) {
+        reportCommandError({ state, err });
+      } finally {
+        state.forceRender((value) => value + 1);
+      }
+    },
+    [ctx, enqueueOrSendPrompt, state],
+  );
 }
 
 async function executeCommandOrPrompt(options: {

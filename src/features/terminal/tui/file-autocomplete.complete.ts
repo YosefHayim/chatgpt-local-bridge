@@ -8,10 +8,10 @@ import {
 } from "./file-autocomplete.helpers.ts";
 import {
   DEFAULT_COMPLETION_LIMIT,
-  IGNORED_COMPLETION_ENTRIES,
   type FileCompletionMatch,
   type FileCompletionOptions,
   type FileCompletionResult,
+  IGNORED_COMPLETION_ENTRIES,
 } from "./file-autocomplete.types.ts";
 
 /** Complete an active `@file` mention against files inside the repo. */
@@ -24,7 +24,12 @@ export async function completeFileMention(
   if (!active) return null;
   const partial = normalizePartialPath(active.partial);
   if (isUnsafePartial(partial)) return null;
-  return buildFileCompletionResult({ active, partial, repoRoot, limit: options.limit ?? DEFAULT_COMPLETION_LIMIT });
+  return buildFileCompletionResult({
+    active,
+    partial,
+    repoRoot,
+    limit: options.limit ?? DEFAULT_COMPLETION_LIMIT,
+  });
 }
 
 /** Build a completion result when matches exist for a partial mention. */
@@ -34,9 +39,14 @@ async function buildFileCompletionResult(input: {
   repoRoot: string;
   limit: number;
 }): Promise<FileCompletionResult | null> {
-  const matches = await listCompletionMatches({ partial: input.partial, repoRoot: input.repoRoot, limit: input.limit });
-  if (matches.length === 0) return null;
-  return { ...input.active, partial: input.partial, replacement: matches[0].path, matches };
+  const matches = await listCompletionMatches({
+    partial: input.partial,
+    repoRoot: input.repoRoot,
+    limit: input.limit,
+  });
+  const best = matches[0];
+  if (best === undefined) return null;
+  return { ...input.active, partial: input.partial, replacement: best.path, matches };
 }
 
 interface ListMatchesInput {
@@ -47,7 +57,10 @@ interface ListMatchesInput {
 
 async function listCompletionMatches(input: ListMatchesInput): Promise<FileCompletionMatch[]> {
   const parts = splitPartialPath(input.partial);
-  const absoluteSearchDir = resolveCompletionSearchDir({ dirPrefix: parts.dirPrefix, repoRoot: input.repoRoot });
+  const absoluteSearchDir = resolveCompletionSearchDir({
+    dirPrefix: parts.dirPrefix,
+    repoRoot: input.repoRoot,
+  });
   if (!absoluteSearchDir) return [];
   return readCompletionMatches({ ...input, ...parts, absoluteSearchDir });
 }
@@ -71,11 +84,13 @@ function resolveCompletionSearchDir(input: { dirPrefix: string; repoRoot: string
 }
 
 /** Read and filter directory entries into completion matches. */
-async function readCompletionMatches(input: ListMatchesInput & {
-  dirPrefix: string;
-  namePrefix: string;
-  absoluteSearchDir: string;
-}): Promise<FileCompletionMatch[]> {
+async function readCompletionMatches(
+  input: ListMatchesInput & {
+    dirPrefix: string;
+    namePrefix: string;
+    absoluteSearchDir: string;
+  },
+): Promise<FileCompletionMatch[]> {
   try {
     const dirents = await readdir(input.absoluteSearchDir, { withFileTypes: true });
     return dirents
@@ -84,14 +99,22 @@ async function readCompletionMatches(input: ListMatchesInput & {
       .filter((dirent) => input.namePrefix.startsWith(".") || !dirent.name.startsWith("."))
       .filter((dirent) => dirent.name.startsWith(input.namePrefix))
       .map((dirent) => mapDirent({ dirent, dirPrefix: input.dirPrefix }))
-      .sort((...args: [FileCompletionMatch, FileCompletionMatch]) => compareCompletionMatches(args[0], args[1]))
+      .sort((...args: [FileCompletionMatch, FileCompletionMatch]) =>
+        compareCompletionMatches(args[0], args[1]),
+      )
       .slice(0, input.limit);
   } catch {
     return [];
   }
 }
 
-function mapDirent(input: { dirent: { name: string; isDirectory(): boolean }; dirPrefix: string }): FileCompletionMatch {
+function mapDirent(input: {
+  dirent: { name: string; isDirectory(): boolean };
+  dirPrefix: string;
+}): FileCompletionMatch {
   const path = input.dirPrefix ? `${input.dirPrefix}/${input.dirent.name}` : input.dirent.name;
-  return { path: input.dirent.isDirectory() ? `${path}/` : path, isDirectory: input.dirent.isDirectory() };
+  return {
+    path: input.dirent.isDirectory() ? `${path}/` : path,
+    isDirectory: input.dirent.isDirectory(),
+  };
 }

@@ -1,5 +1,5 @@
-import { GeminiPage } from "./gemini/gemini-page.class.ts";
 import type { BrowserProvider } from "./browser-provider.types.ts";
+import { GeminiPage } from "./gemini/gemini-page.class.ts";
 
 const geminiPage = new GeminiPage();
 

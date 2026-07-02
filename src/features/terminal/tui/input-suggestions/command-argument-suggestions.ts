@@ -1,5 +1,9 @@
+import {
+  exportArgumentSuggestions,
+  restoreArgumentSuggestions,
+  rewindArgumentSuggestions,
+} from "./command-arg-handlers.ts";
 import { COMMAND_SUGGESTION_RULES } from "./command-rules.ts";
-import { exportArgumentSuggestions, restoreArgumentSuggestions, rewindArgumentSuggestions } from "./command-arg-handlers.ts";
 import { withFilteredSuggestions } from "./filter-suggestions.ts";
 import { activeArgumentToken } from "./parse-slash-input.ts";
 import { pathSuggestionGroup } from "./path-suggestions.ts";
@@ -8,7 +12,11 @@ import {
   resumeSessionSuggestions,
   sessionSuggestions,
 } from "./session-checkpoint-suggestions.ts";
-import type { InputSuggestionGroup, LoadInputSuggestionsOptions, ParsedSlashInput } from "./types.ts";
+import type {
+  InputSuggestionGroup,
+  LoadInputSuggestionsOptions,
+  ParsedSlashInput,
+} from "./types.ts";
 
 /** Build autocomplete suggestions for slash command arguments. */
 export async function commandArgumentSuggestions(
@@ -20,7 +28,13 @@ export async function commandArgumentSuggestions(
     hint: "Type arguments for this command. Use @ to mention repo files.",
   };
   const token = activeArgumentToken(slash);
-  const base: InputSuggestionGroup = { title: rule.title, hint: rule.hint, replacementStart: token.start, replacementEnd: token.end, suggestions: [] };
+  const base: InputSuggestionGroup = {
+    title: rule.title,
+    hint: rule.hint,
+    replacementStart: token.start,
+    replacementEnd: token.end,
+    suggestions: [],
+  };
   return dispatchCommandArgumentSuggestions({ slash, options, rule, base, token });
 }
 
@@ -39,7 +53,12 @@ async function dispatchCommandArgumentSuggestions(
 ): Promise<InputSuggestionGroup | null> {
   const handler = COMMAND_ARG_HANDLERS[params.slash.command];
   if (handler) return handler(params);
-  return withFilteredSuggestions({ group: params.base, suggestions: params.rule.values ?? [], query: params.token.value, limit: params.options.limit });
+  return withFilteredSuggestions({
+    group: params.base,
+    suggestions: params.rule.values ?? [],
+    query: params.token.value,
+    limit: params.options.limit,
+  });
 }
 
 /** Per-command argument suggestion handlers. */
@@ -51,22 +70,91 @@ const COMMAND_ARG_HANDLERS: Record<
   open: (p) => filteredResumeSuggestions(p),
   transcript: (p) => filteredSessionSuggestions(p),
   copy: (p) => filteredSessionSuggestions(p),
-  export: (p) => exportArgumentSuggestions({ slash: p.slash, options: p.options, base: p.base, token: p.token }),
-  permissions: (p) => Promise.resolve(withFilteredSuggestions({ group: p.base, suggestions: p.rule.values ?? [], query: p.token.value, limit: p.options.limit })),
-  model: (p) => Promise.resolve(withFilteredSuggestions({ group: p.base, suggestions: modelSuggestions(p.options), query: p.token.value, limit: p.options.limit })),
-  restore: (p) => restoreArgumentSuggestions({ slash: p.slash, options: p.options, base: p.base, token: p.token }),
-  rewind: (p) => rewindArgumentSuggestions({ slash: p.slash, options: p.options, base: p.base, token: p.token }),
-  retry: (p) => rewindArgumentSuggestions({ slash: p.slash, options: p.options, base: p.base, token: p.token }),
-  review: (p) => Promise.resolve(withFilteredSuggestions({ group: p.base, suggestions: p.rule.values ?? [], query: p.token.value, limit: p.options.limit })),
-  "attach-image": (p) => pathSuggestionGroup({ base: p.base, partial: p.token.value, options: p.options, kind: "image" }),
-  screenshot: (p) => Promise.resolve(withFilteredSuggestions({ group: p.base, suggestions: p.rule.values ?? [], query: p.token.value, limit: p.options.limit })),
-  "ui-qa": (p) => Promise.resolve(withFilteredSuggestions({ group: p.base, suggestions: p.rule.values ?? [], query: p.token.value, limit: p.options.limit })),
-  task: (p) => Promise.resolve({ ...p.base, replacementStart: undefined, replacementEnd: undefined, hint: "Describe the coding task. Type @ to see repo files and folders." }),
-  work: (p) => Promise.resolve({ ...p.base, replacementStart: undefined, replacementEnd: undefined, hint: "Describe the coding task. Type @ to see repo files and folders." }),
+  export: (p) =>
+    exportArgumentSuggestions({ slash: p.slash, options: p.options, base: p.base, token: p.token }),
+  permissions: (p) =>
+    Promise.resolve(
+      withFilteredSuggestions({
+        group: p.base,
+        suggestions: p.rule.values ?? [],
+        query: p.token.value,
+        limit: p.options.limit,
+      }),
+    ),
+  model: (p) =>
+    Promise.resolve(
+      withFilteredSuggestions({
+        group: p.base,
+        suggestions: modelSuggestions(p.options),
+        query: p.token.value,
+        limit: p.options.limit,
+      }),
+    ),
+  restore: (p) =>
+    restoreArgumentSuggestions({
+      slash: p.slash,
+      options: p.options,
+      base: p.base,
+      token: p.token,
+    }),
+  rewind: (p) =>
+    rewindArgumentSuggestions({ slash: p.slash, options: p.options, base: p.base, token: p.token }),
+  retry: (p) =>
+    rewindArgumentSuggestions({ slash: p.slash, options: p.options, base: p.base, token: p.token }),
+  review: (p) =>
+    Promise.resolve(
+      withFilteredSuggestions({
+        group: p.base,
+        suggestions: p.rule.values ?? [],
+        query: p.token.value,
+        limit: p.options.limit,
+      }),
+    ),
+  "attach-image": (p) =>
+    pathSuggestionGroup({
+      base: p.base,
+      partial: p.token.value,
+      options: p.options,
+      kind: "image",
+    }),
+  screenshot: (p) =>
+    Promise.resolve(
+      withFilteredSuggestions({
+        group: p.base,
+        suggestions: p.rule.values ?? [],
+        query: p.token.value,
+        limit: p.options.limit,
+      }),
+    ),
+  "ui-qa": (p) =>
+    Promise.resolve(
+      withFilteredSuggestions({
+        group: p.base,
+        suggestions: p.rule.values ?? [],
+        query: p.token.value,
+        limit: p.options.limit,
+      }),
+    ),
+  task: (p) =>
+    Promise.resolve({
+      ...p.base,
+      replacementStart: undefined,
+      replacementEnd: undefined,
+      hint: "Describe the coding task. Type @ to see repo files and folders.",
+    }),
+  work: (p) =>
+    Promise.resolve({
+      ...p.base,
+      replacementStart: undefined,
+      replacementEnd: undefined,
+      hint: "Describe the coding task. Type @ to see repo files and folders.",
+    }),
 };
 
 /** Filter resume/open session suggestions. */
-async function filteredResumeSuggestions(params: DispatchCommandArgumentSuggestionsParams): Promise<InputSuggestionGroup> {
+async function filteredResumeSuggestions(
+  params: DispatchCommandArgumentSuggestionsParams,
+): Promise<InputSuggestionGroup> {
   return withFilteredSuggestions({
     group: params.base,
     suggestions: await resumeSessionSuggestions(params.options),
@@ -76,7 +164,9 @@ async function filteredResumeSuggestions(params: DispatchCommandArgumentSuggesti
 }
 
 /** Filter transcript/copy session suggestions. */
-async function filteredSessionSuggestions(params: DispatchCommandArgumentSuggestionsParams): Promise<InputSuggestionGroup> {
+async function filteredSessionSuggestions(
+  params: DispatchCommandArgumentSuggestionsParams,
+): Promise<InputSuggestionGroup> {
   return withFilteredSuggestions({
     group: params.base,
     suggestions: await sessionSuggestions(params.options),

@@ -14,7 +14,9 @@ describe("conversation-url", () => {
 
   it("builds canonical conversation URLs from ids", () => {
     expect(conversationUrlFromIdOrUrl("abc-123")).toBe("https://chatgpt.com/c/abc-123");
-    expect(conversationUrlFromIdOrUrl("https://chatgpt.com/c/abc-123")).toBe("https://chatgpt.com/c/abc-123");
+    expect(conversationUrlFromIdOrUrl("https://chatgpt.com/c/abc-123")).toBe(
+      "https://chatgpt.com/c/abc-123",
+    );
   });
 
   it("detects when the page is already on the target conversation", () => {

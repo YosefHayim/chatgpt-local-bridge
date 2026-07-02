@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readdir, readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import ts from "typescript";
 
@@ -10,7 +10,7 @@ async function walk(dir) {
   const files = [];
   for (const entry of entries) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...await walk(path));
+    if (entry.isDirectory()) files.push(...(await walk(path)));
     else if (entry.name.endsWith(".class.ts")) files.push(path);
   }
   return files;
@@ -38,12 +38,21 @@ const files = await walk(ROOT);
 
 for (const file of files) {
   const text = await readFile(file, "utf8");
-  const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const sourceFile = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
 
   const exportedClasses = [];
   /** @param node {import('typescript').Node} */
   function collectClasses(node) {
-    if (ts.isClassDeclaration(node) && node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
+    if (
+      ts.isClassDeclaration(node) &&
+      node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+    ) {
       exportedClasses.push(node);
     }
     ts.forEachChild(node, collectClasses);
@@ -55,8 +64,8 @@ for (const file of files) {
 
   for (const member of serviceClass.members) {
     if (!ts.isMethodDeclaration(member) || !member.name) continue;
-    const isPrivate = member.modifiers?.some((m) =>
-      m.kind === ts.SyntaxKind.PrivateKeyword || m.kind === ts.SyntaxKind.ProtectedKeyword,
+    const isPrivate = member.modifiers?.some(
+      (m) => m.kind === ts.SyntaxKind.PrivateKeyword || m.kind === ts.SyntaxKind.ProtectedKeyword,
     );
     if (isPrivate) continue;
     if (!hasJSDoc(member)) {

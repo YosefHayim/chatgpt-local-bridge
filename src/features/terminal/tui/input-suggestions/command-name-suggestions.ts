@@ -1,6 +1,10 @@
 import type { CommandDef } from "../../../domain/types.ts";
 import { loadCustomCommands } from "../../../user-config/hooks.ts";
-import type { InputSuggestion, InputSuggestionGroup, LoadInputSuggestionsOptions } from "./types.ts";
+import type {
+  InputSuggestion,
+  InputSuggestionGroup,
+  LoadInputSuggestionsOptions,
+} from "./types.ts";
 import { DEFAULT_SUGGESTION_LIMIT } from "./types.ts";
 
 /** Inputs for building slash command name suggestions. */
@@ -11,8 +15,13 @@ interface CommandNameSuggestionsParams {
 }
 
 /** Build autocomplete suggestions for an in-progress slash command name. */
-export async function commandNameSuggestions(params: CommandNameSuggestionsParams): Promise<InputSuggestionGroup | null> {
-  const custom = await loadCustomCommands({ repoRoot: params.options.repoRoot, homeDir: params.options.customCommandsHomeDir });
+export async function commandNameSuggestions(
+  params: CommandNameSuggestionsParams,
+): Promise<InputSuggestionGroup | null> {
+  const custom = await loadCustomCommands({
+    repoRoot: params.options.repoRoot,
+    homeDir: params.options.customCommandsHomeDir,
+  });
   const suggestions = buildCommandNameSuggestions({ params, custom });
   return {
     title: "Commands",

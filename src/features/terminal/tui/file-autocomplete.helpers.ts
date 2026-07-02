@@ -9,14 +9,21 @@ interface FindMentionInput {
 }
 
 /** Find the active `@file` mention span before the cursor. */
-export function findActiveFileMention(input: FindMentionInput | string, cursor?: number): ActiveFileMention | null {
+export function findActiveFileMention(
+  input: FindMentionInput | string,
+  cursor?: number,
+): ActiveFileMention | null {
   const text = typeof input === "string" ? input : input.input;
-  const position = typeof input === "string" ? cursor ?? text.length : input.cursor ?? text.length;
+  const position =
+    typeof input === "string" ? (cursor ?? text.length) : (input.cursor ?? text.length);
   return parseActiveFileMention({ text, position });
 }
 
 /** Parse an active `@file` mention ending at the cursor position. */
-function parseActiveFileMention(input: { text: string; position: number }): ActiveFileMention | null {
+function parseActiveFileMention(input: {
+  text: string;
+  position: number;
+}): ActiveFileMention | null {
   const beforeCursor = input.text.slice(0, input.position);
   const start = beforeCursor.lastIndexOf("@");
   if (start === -1 || !isMentionBoundary({ beforeCursor, start })) return null;
@@ -24,7 +31,11 @@ function parseActiveFileMention(input: { text: string; position: number }): Acti
 }
 
 /** Read the partial mention text when the span is valid. */
-function readMentionPartial(input: { start: number; beforeCursor: string; position: number }): ActiveFileMention | null {
+function readMentionPartial(input: {
+  start: number;
+  beforeCursor: string;
+  position: number;
+}): ActiveFileMention | null {
   const partial = input.beforeCursor.slice(input.start + 1);
   if (/\s/.test(partial)) return null;
   return { start: input.start, end: input.position, partial };
@@ -48,12 +59,18 @@ export function isUnsafePartial(partial: string): boolean {
 }
 
 /** Sort directories before files, then lexicographically by path. */
-export function compareCompletionMatches(left: FileCompletionMatch, right: FileCompletionMatch): number {
+export function compareCompletionMatches(
+  left: FileCompletionMatch,
+  right: FileCompletionMatch,
+): number {
   if (left.isDirectory !== right.isDirectory) return left.isDirectory ? -1 : 1;
   return left.path.localeCompare(right.path);
 }
 
 /** Replace the active mention span with the chosen completion path. */
-export function applyFileCompletion(input: string, completion: { start: number; end: number; replacement: string }): string {
+export function applyFileCompletion(
+  input: string,
+  completion: { start: number; end: number; replacement: string },
+): string {
   return `${input.slice(0, completion.start + 1)}${completion.replacement}${input.slice(completion.end)}`;
 }

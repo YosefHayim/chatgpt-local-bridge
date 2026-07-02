@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { hasErrorCode, isNodeError } from "../domain/errors.ts";
@@ -162,7 +162,10 @@ export interface ProjectInstructions {
   promptText: string;
 }
 
-const PROJECT_INSTRUCTION_FILES: Array<ProjectInstructionFile["fileName"]> = ["AGENTS.md", "CLAUDE.md"];
+const PROJECT_INSTRUCTION_FILES: Array<ProjectInstructionFile["fileName"]> = [
+  "AGENTS.md",
+  "CLAUDE.md",
+];
 
 // ---------------------------------------------------------------------------
 // UserConfig
@@ -189,7 +192,7 @@ export class UserConfig {
     const dirs = this.commandDirs(options);
     const commands: CustomCommand[] = [];
     for (const entry of dirs) {
-      commands.push(...await this.loadCommandsFromDir(entry));
+      commands.push(...(await this.loadCommandsFromDir(entry)));
     }
     return commands.sort(compareCustomCommands);
   }
@@ -244,7 +247,10 @@ export class UserConfig {
   }
 
   /** Load one custom command markdown file. */
-  private async loadCommandFile(input: { entry: CommandDir; fileName: string }): Promise<CustomCommand> {
+  private async loadCommandFile(input: {
+    entry: CommandDir;
+    fileName: string;
+  }): Promise<CustomCommand> {
     const filePath = join(input.entry.dir, input.fileName);
     const parsed = parseCustomCommandFile(await readFile(filePath, "utf-8"));
     return {
@@ -262,7 +268,9 @@ export class UserConfig {
   private async readMarkdownFiles(dir: string): Promise<string[]> {
     try {
       const entries = await readdir(dir, { withFileTypes: true });
-      return entries.filter((entry) => entry.isFile() && entry.name.endsWith(".md")).map((entry) => entry.name)
+      return entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+        .map((entry) => entry.name)
         .sort(compareStrings);
     } catch (error) {
       if (isNodeError(error) && error.code === "ENOENT") return [];
@@ -279,13 +287,15 @@ export class UserConfig {
       throw error;
     }
   }
-
 }
 
 /** Return hook config search paths in deterministic load order. */
-export function hookConfigPaths(input: { repoRoot: string; homeDir?: string } | string, homeDir = homedir()): string[] {
+export function hookConfigPaths(
+  input: { repoRoot: string; homeDir?: string } | string,
+  homeDir = homedir(),
+): string[] {
   const repoRoot = typeof input === "string" ? input : input.repoRoot;
-  const home = typeof input === "string" ? homeDir : input.homeDir ?? homedir();
+  const home = typeof input === "string" ? homeDir : (input.homeDir ?? homedir());
   return [join(repoRoot, ".bridge", HOOKS_FILE), homeHooksPath(home)];
 }
 
@@ -296,8 +306,10 @@ export function isHookLifecycleEvent(value: string): value is HookLifecycleEvent
 
 /** Whether a value is a supported hook command shape. */
 function isHookCommand(value: unknown): value is string | readonly string[] {
-  return typeof value === "string"
-    || (Array.isArray(value) && value.every((part) => typeof part === "string"));
+  return (
+    typeof value === "string" ||
+    (Array.isArray(value) && value.every((part) => typeof part === "string"))
+  );
 }
 
 /** Whether a value is a plain object record. */
@@ -337,13 +349,19 @@ function compareStrings(left: string, right: string): number {
 // ---------------------------------------------------------------------------
 
 /** Parse and validate a hooks.json payload without executing anything. */
-export function parseHooksConfig(input: { raw: unknown; source?: string } | unknown, source = "inline"): ParseHooksResult {
-  const payload = typeof input === "object" && input !== null && "raw" in input
-    ? input as { raw: unknown; source?: string }
-    : { raw: input, source };
+export function parseHooksConfig(
+  input: { raw: unknown; source?: string } | unknown,
+  source = "inline",
+): ParseHooksResult {
+  const payload =
+    typeof input === "object" && input !== null && "raw" in input
+      ? (input as { raw: unknown; source?: string })
+      : { raw: input, source };
   const hooksValue = readObjectProperty(payload.raw, "hooks");
-  if (Array.isArray(hooksValue)) return parseHookArray({ hooksValue, source: payload.source ?? source });
-  if (isRecord(hooksValue)) return parseHookObject({ hooksValue, source: payload.source ?? source });
+  if (Array.isArray(hooksValue))
+    return parseHookArray({ hooksValue, source: payload.source ?? source });
+  if (isRecord(hooksValue))
+    return parseHookObject({ hooksValue, source: payload.source ?? source });
   return { hooks: [], errors: [`${payload.source ?? source}: hooks must be an array or object`] };
 }
 
@@ -352,7 +370,11 @@ function parseHookArray(input: { hooksValue: unknown[]; source: string }): Parse
   const hooks: HookDefinition[] = [];
   const errors: string[] = [];
   for (let index = 0; index < input.hooksValue.length; index += 1) {
-    const parsed = parseHookEntry({ raw: input.hooksValue[index], source: input.source, location: String(index) });
+    const parsed = parseHookEntry({
+      raw: input.hooksValue[index],
+      source: input.source,
+      location: String(index),
+    });
     if (parsed.hook) hooks.push(parsed.hook);
     errors.push(...parsed.errors);
   }
@@ -360,7 +382,10 @@ function parseHookArray(input: { hooksValue: unknown[]; source: string }): Parse
 }
 
 /** Parse a hooks object keyed by lifecycle event. */
-function parseHookObject(input: { hooksValue: Record<string, unknown>; source: string }): ParseHooksResult {
+function parseHookObject(input: {
+  hooksValue: Record<string, unknown>;
+  source: string;
+}): ParseHooksResult {
   const hooks: HookDefinition[] = [];
   const errors: string[] = [];
   for (const [eventName, value] of Object.entries(input.hooksValue)) {
@@ -397,10 +422,17 @@ function parseHookEventHooks(input: {
 }
 
 /** Parse one hook entry from raw JSON. */
-function parseHookEntry(input: { raw: unknown; source: string; location: string }): { hook?: HookDefinition; errors: string[] } {
+function parseHookEntry(input: { raw: unknown; source: string; location: string }): {
+  hook?: HookDefinition;
+  errors: string[];
+} {
   const fields = readHookFields(input.raw);
   const errors = validateHookFields({ fields, source: input.source, location: input.location });
-  if (errors.length > 0 || typeof fields.event !== "string" || !isHookLifecycleEvent(fields.event)) {
+  if (
+    errors.length > 0 ||
+    typeof fields.event !== "string" ||
+    !isHookLifecycleEvent(fields.event)
+  ) {
     return { errors };
   }
   if (!isHookCommand(fields.command)) return { errors };
@@ -423,7 +455,11 @@ function readHookFields(raw: unknown): RawHookFields {
 }
 
 /** Validate raw hook fields and return error messages. */
-function validateHookFields(input: { fields: RawHookFields; source: string; location: string }): string[] {
+function validateHookFields(input: {
+  fields: RawHookFields;
+  source: string;
+  location: string;
+}): string[] {
   const errors: string[] = [];
   if (typeof input.fields.event !== "string" || !isHookLifecycleEvent(input.fields.event)) {
     errors.push(`${input.source}: ${input.location}.event must be a supported lifecycle event`);
@@ -446,16 +482,28 @@ export async function runHooks(
   hooks?: readonly HookDefinition[],
 ): Promise<HookRunResult[]> {
   const event = typeof input === "string" ? input : input.event;
-  const definitions = typeof input === "string" ? hooks ?? [] : input.hooks;
-  return definitions.filter((hook) => hook.event === event).map((hook) => mapHookRun({ event, hook }));
+  const definitions = typeof input === "string" ? (hooks ?? []) : input.hooks;
+  return definitions
+    .filter((hook) => hook.event === event)
+    .map((hook) => mapHookRun({ event, hook }));
 }
 
 /** Map one hook definition to a run result. */
 function mapHookRun(input: { event: HookLifecycleEvent; hook: HookDefinition }): HookRunResult {
   if (!input.hook.enabled) {
-    return { event: input.event, command: input.hook.command, status: "disabled", reason: "hook-disabled" };
+    return {
+      event: input.event,
+      command: input.hook.command,
+      status: "disabled",
+      reason: "hook-disabled",
+    };
   }
-  return { event: input.event, command: input.hook.command, status: "skipped", reason: "hook-command-execution-disabled" };
+  return {
+    event: input.event,
+    command: input.hook.command,
+    status: "skipped",
+    reason: "hook-command-execution-disabled",
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -523,8 +571,8 @@ function applyFrontmatterLine(input: {
     metadata: input.metadata,
     lines: input.lines,
     index: input.index,
-    key: keyValue[1],
-    value: keyValue[2].trim(),
+    key: keyValue[1] ?? "",
+    value: (keyValue[2] ?? "").trim(),
   });
 }
 
@@ -538,7 +586,13 @@ function applyFrontmatterKey(input: {
 }): number | undefined {
   if (input.key === "description") input.metadata.description = stripYamlQuotes(input.value);
   if (input.key === "model") input.metadata.model = stripYamlQuotes(input.value);
-  if (input.key === "allowedTools") return parseAllowedTools({ metadata: input.metadata, lines: input.lines, index: input.index, value: input.value });
+  if (input.key === "allowedTools")
+    return parseAllowedTools({
+      metadata: input.metadata,
+      lines: input.lines,
+      index: input.index,
+      value: input.value,
+    });
   return input.index;
 }
 
@@ -567,7 +621,7 @@ function parseAllowedToolsList(input: {
   while (index + 1 < input.lines.length) {
     const listItem = /^\s*-\s*(.+)$/.exec(input.lines[index + 1] ?? "");
     if (!listItem) break;
-    list.push(stripYamlQuotes(listItem[1].trim()));
+    list.push(stripYamlQuotes((listItem[1] ?? "").trim()));
     index += 1;
   }
   input.metadata.allowedTools = list;
@@ -616,7 +670,10 @@ function renderTemplateReplacement(input: {
 
 /** Strip surrounding YAML quotes from a scalar value. */
 function stripYamlQuotes(value: string): string {
-  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
     return value.slice(1, -1);
   }
   return value;
@@ -625,7 +682,10 @@ function stripYamlQuotes(value: string): string {
 /** Parse a comma-separated or bracketed inline YAML list. */
 function parseInlineList(value: string): string[] {
   const withoutBrackets = value.startsWith("[") && value.endsWith("]") ? value.slice(1, -1) : value;
-  return withoutBrackets.split(",").map((item) => stripYamlQuotes(item.trim())).filter(Boolean);
+  return withoutBrackets
+    .split(",")
+    .map((item) => stripYamlQuotes(item.trim()))
+    .filter(Boolean);
 }
 
 /** Trim leading and trailing blank lines from markdown bodies. */
@@ -657,7 +717,9 @@ export async function loadHooksConfig(options: LoadHooksOptions): Promise<Loaded
 }
 
 /** Discover custom commands via the default {@link UserConfig} instance. */
-export async function loadCustomCommands(options: LoadCustomCommandsOptions): Promise<CustomCommand[]> {
+export async function loadCustomCommands(
+  options: LoadCustomCommandsOptions,
+): Promise<CustomCommand[]> {
   return defaultUserConfig.loadCustomCommands(options);
 }
 

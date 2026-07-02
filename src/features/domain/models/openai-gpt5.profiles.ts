@@ -17,7 +17,12 @@ export const OPENAI_GPT5_MODEL_PROFILES: ModelProfile[] = [
     id: "gpt-5.5-thinking",
     label: "GPT-5.5 Thinking",
     provider: "openai",
-    aliases: ["gpt-5.5 thinking", "gpt 5.5 thinking", "thinking", "model-switcher-gpt-5-5-thinking"],
+    aliases: [
+      "gpt-5.5 thinking",
+      "gpt 5.5 thinking",
+      "thinking",
+      "model-switcher-gpt-5-5-thinking",
+    ],
     contextWindow: 128_000,
     maxOutputTokens: 16_384,
     sourceUrl: OPENAI_MODELS_URL,

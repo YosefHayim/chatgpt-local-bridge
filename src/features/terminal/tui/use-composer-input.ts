@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { ESCAPE_CONTROL } from "./composer-constants.ts";
 import type { InputMode } from "./app-types.ts";
+import { ESCAPE_CONTROL } from "./composer-constants.ts";
 import type { ComposerState } from "./use-composer-state.ts";
 
 /** Options for composer text input handlers. */
@@ -19,10 +19,13 @@ export function useComposerInputHandlers(options: ComposerInputHandlersOptions) 
 }
 
 function useHandleInputChange(state: ComposerState) {
-  return useCallback((value: string) => {
-    if (stripEscapeControl({ state, value })) return;
-    applyInputValue({ state, value });
-  }, [state]);
+  return useCallback(
+    (value: string) => {
+      if (stripEscapeControl({ state, value })) return;
+      applyInputValue({ state, value });
+    },
+    [state],
+  );
 }
 
 function stripEscapeControl(input: { state: ComposerState; value: string }) {
@@ -51,9 +54,12 @@ function resolveInputMode(value: string): InputMode {
 
 function useHandleSubmit(options: ComposerInputHandlersOptions) {
   const { state, runCommand } = options;
-  return useCallback(async (value: string) => {
-    await submitComposerInput({ state, runCommand, value });
-  }, [runCommand, state]);
+  return useCallback(
+    async (value: string) => {
+      await submitComposerInput({ state, runCommand, value });
+    },
+    [runCommand, state],
+  );
 }
 
 /** Handle one composer submit, including history and slash-only clears. */

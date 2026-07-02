@@ -1,8 +1,7 @@
+import type { PermissionMode } from "../permissions.ts";
+
 /** Supported browser providers for the bridge terminal. */
 export type BridgeProvider = "chatgpt" | "gemini";
-
-/** Permission mode for tool execution in the bridge. */
-export type BridgePermissionMode = "read-only" | "ask" | "auto";
 
 /** Persisted bridge configuration for a target repo. */
 export interface BridgeConfig {
@@ -21,5 +20,5 @@ export interface BridgeConfig {
   /** Preferred model name or alias. */
   model?: string;
   /** Default permission mode for tool calls. */
-  permissionMode?: BridgePermissionMode;
+  permissionMode?: PermissionMode;
 }

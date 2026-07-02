@@ -1,19 +1,22 @@
-import {
-  applyInputSuggestion,
-  type InputSuggestionGroup,
-} from "./input-suggestions.ts";
 import type { CommandDef } from "../../domain/types.ts";
-import type { ComposerState } from "./use-composer-state.ts";
 import type { ComposerKeyboardOptions } from "./composer-keyboard-types.ts";
+import { type InputSuggestionGroup, applyInputSuggestion } from "./input-suggestions.ts";
+import type { ComposerState } from "./use-composer-state.ts";
 
-export function handleCommandListKeys(options: ComposerKeyboardOptions & {
-  char: string;
-  key: { upArrow?: boolean; downArrow?: boolean; tab?: boolean; return?: boolean };
-}) {
+export function handleCommandListKeys(
+  options: ComposerKeyboardOptions & {
+    char: string;
+    key: { upArrow?: boolean; downArrow?: boolean; tab?: boolean; return?: boolean };
+  },
+) {
   const suggestions = options.state.inputSuggestions?.suggestions ?? [];
   if (options.key.upArrow) return moveCommandSelectionUp(options.state);
   if (options.key.downArrow) {
-    return moveCommandSelectionDown({ state: options.state, suggestions, matches: options.state.matches });
+    return moveCommandSelectionDown({
+      state: options.state,
+      suggestions,
+      matches: options.state.matches,
+    });
   }
   if (options.key.tab) return completeCommandTab(options);
   return options.key.return ? submitCommandSelection({ options, suggestions }) : false;
@@ -47,6 +50,7 @@ function completeSuggestionTab(input: {
 }) {
   const suggestionIndex = Math.min(input.state.selectedIdx, input.suggestions.length - 1);
   const suggestion = input.suggestions[suggestionIndex] ?? input.suggestions[0];
+  if (!suggestion) return;
   applySuggestionSelection({ state: input.state, suggestionIndex, label: suggestion.label });
 }
 
@@ -56,7 +60,9 @@ function applySuggestionSelection(input: {
   suggestionIndex: number;
   label: string;
 }): void {
-  const nextInput = applyInputSuggestion(input.state.input, input.state.inputSuggestions!, input.suggestionIndex);
+  const suggestions = input.state.inputSuggestions;
+  if (!suggestions) return;
+  const nextInput = applyInputSuggestion(input.state.input, suggestions, input.suggestionIndex);
   input.state.setInput(nextInput);
   input.state.setMode("typing");
   input.state.setStatus(`Completed ${input.label}`);
@@ -76,6 +82,7 @@ function submitSuggestionCommand(input: {
   suggestions: InputSuggestionGroup["suggestions"];
 }) {
   const suggestion = input.suggestions[input.options.state.selectedIdx] ?? input.suggestions[0];
+  if (!suggestion) return false;
   resetCommandInput(input.options.state);
   void input.options.runCommand(suggestion.label);
   return true;
@@ -83,6 +90,7 @@ function submitSuggestionCommand(input: {
 
 function submitMatchedCommand(options: ComposerKeyboardOptions) {
   const cmd = options.state.matches[options.state.selectedIdx] ?? options.state.matches[0];
+  if (!cmd) return false;
   resetCommandInput(options.state);
   void options.runCommand(`/${cmd.name}`);
   return true;

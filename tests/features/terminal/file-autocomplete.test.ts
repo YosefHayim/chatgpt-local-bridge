@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -50,7 +50,10 @@ describe("completeFileMention", () => {
 
     const result = await completeFileMention("read @src/features/", repoRoot, { limit: 5 });
 
-    expect(result?.matches.map((match) => match.path)).toEqual(["src/features/bridge/", "src/features/terminal/"]);
+    expect(result?.matches.map((match) => match.path)).toEqual([
+      "src/features/bridge/",
+      "src/features/terminal/",
+    ]);
   });
 
   it("keeps hidden folders out of default @ suggestions unless the user types dot", async () => {
@@ -74,12 +77,14 @@ describe("completeFileMention", () => {
 
 describe("applyFileCompletion", () => {
   it("replaces only the active mention token", () => {
-    expect(applyFileCompletion("read @src/features/t please", {
-      start: 5,
-      end: 20,
-      partial: "src/features/t",
-      replacement: "src/features/terminal/",
-      matches: [],
-    })).toBe("read @src/features/terminal/ please");
+    expect(
+      applyFileCompletion("read @src/features/t please", {
+        start: 5,
+        end: 20,
+        partial: "src/features/t",
+        replacement: "src/features/terminal/",
+        matches: [],
+      }),
+    ).toBe("read @src/features/terminal/ please");
   });
 });

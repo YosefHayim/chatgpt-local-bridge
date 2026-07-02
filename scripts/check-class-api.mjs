@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readdir, readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import ts from "typescript";
 
@@ -13,7 +13,7 @@ async function walk(dir) {
   const files = [];
   for (const entry of entries) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...await walk(path));
+    if (entry.isDirectory()) files.push(...(await walk(path)));
     else if (entry.name.endsWith(".class.ts")) files.push(path);
   }
   return files;
@@ -58,13 +58,22 @@ const files = await walk(ROOT);
 
 for (const file of files) {
   const text = await readFile(file, "utf8");
-  const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const sourceFile = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
 
   const exportedClasses = [];
 
   /** @param node {import('typescript').Node} */
   function visit(node) {
-    if (ts.isClassDeclaration(node) && node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
+    if (
+      ts.isClassDeclaration(node) &&
+      node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+    ) {
       exportedClasses.push(node);
     }
     ts.forEachChild(node, visit);
@@ -88,7 +97,9 @@ for (const file of files) {
 
     const publicMethods = cls.members.filter((m) => isPublicMethod(m));
     if (publicMethods.length > MAX_PUBLIC_METHODS) {
-      violations.push(`${file}: ${name} has ${publicMethods.length} public methods (max ${MAX_PUBLIC_METHODS})`);
+      violations.push(
+        `${file}: ${name} has ${publicMethods.length} public methods (max ${MAX_PUBLIC_METHODS})`,
+      );
     }
   }
 }

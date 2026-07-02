@@ -84,6 +84,7 @@ export function findReverseHistoryMatch(entries: string[], query: string): strin
   const normalizedQuery = query.toLowerCase();
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     const entry = entries[i];
+    if (entry === undefined) continue;
     if (normalizedQuery === "" || entry.toLowerCase().includes(normalizedQuery)) return entry;
   }
   return null;

@@ -7,15 +7,18 @@ import {
   downloadAllAttachmentsTool,
   downloadAttachmentTool,
   listAttachmentsTool,
-} from "../src/features/tools/mcp-server.class.ts";
+} from "../../../src/features/tools/mcp-server.class.ts";
 
 const { downloadAttachmentMock, downloadAllMock } = vi.hoisted(() => ({
   downloadAttachmentMock: vi.fn(),
   downloadAllMock: vi.fn(),
 }));
 
-vi.mock("../src/features/providers/chatgpt/chatgpt-page.class.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/features/providers/chatgpt/chatgpt-page.class.ts")>();
+vi.mock("../../../src/features/providers/chatgpt/chatgpt-page.class.ts", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../src/features/providers/chatgpt/chatgpt-page.class.ts")
+    >();
   return {
     ...actual,
     downloadAttachment: downloadAttachmentMock,
@@ -27,7 +30,9 @@ const originalCwd = process.cwd();
 let tempDir: string;
 
 beforeEach(async () => {
-  tempDir = await import("node:fs/promises").then(({ mkdtemp }) => mkdtemp(path.join(os.tmpdir(), "bridge-mcp-attachments-")));
+  tempDir = await import("node:fs/promises").then(({ mkdtemp }) =>
+    mkdtemp(path.join(os.tmpdir(), "bridge-mcp-attachments-")),
+  );
   process.chdir(tempDir);
   downloadAttachmentMock.mockReset();
   downloadAllMock.mockReset();
@@ -55,7 +60,12 @@ describe("MCP attachment tools", () => {
 
     const result = await downloadAttachmentTool.handler({ _page: page("conv-1"), id: "file-1" });
 
-    expect(downloadAttachmentMock).toHaveBeenCalledWith(expect.any(Object), "conv-1", "file-1", undefined);
+    expect(downloadAttachmentMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      "conv-1",
+      "file-1",
+      undefined,
+    );
     expect(JSON.parse(result.output)).toEqual({ path: "/tmp/report.csv", bytes: 42 });
   });
 
@@ -85,19 +95,23 @@ describe("MCP attachment tools", () => {
 async function writeManifest(conversationId: string): Promise<void> {
   const dir = path.join(tempDir, "downloads", conversationId);
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, "manifest.json"), JSON.stringify({
-    conversationId,
-    attachments: [
-      {
-        id: "file-1",
-        kind: "file",
-        url: "blob:https://chatgpt.test/report",
-        filename: "report.csv",
-        messageIndex: 2,
-        createdAt: "2026-05-01T00:00:00.000Z",
-      },
-    ],
-  }), "utf8");
+  await writeFile(
+    path.join(dir, "manifest.json"),
+    JSON.stringify({
+      conversationId,
+      attachments: [
+        {
+          id: "file-1",
+          kind: "file",
+          url: "blob:https://chatgpt.test/report",
+          filename: "report.csv",
+          messageIndex: 2,
+          createdAt: "2026-05-01T00:00:00.000Z",
+        },
+      ],
+    }),
+    "utf8",
+  );
 }
 
 function page(conversationId: string): Page {

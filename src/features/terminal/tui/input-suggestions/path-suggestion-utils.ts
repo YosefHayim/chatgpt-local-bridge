@@ -1,10 +1,19 @@
 import type { InputSuggestion } from "./types.ts";
 
 /** Map one directory entry to an InputSuggestion. */
-export function entryToSuggestion(name: string, dirPrefix: string, isDirectory: boolean): InputSuggestion {
+export function entryToSuggestion(
+  name: string,
+  dirPrefix: string,
+  isDirectory: boolean,
+): InputSuggestion {
   const path = dirPrefix ? `${dirPrefix}/${name}` : name;
   const value = isDirectory ? `${path}/` : path;
-  return { value, label: value, kind: isDirectory ? "folder" : "file", detail: isDirectory ? "folder" : undefined };
+  return {
+    value,
+    label: value,
+    kind: isDirectory ? "folder" : "file",
+    detail: isDirectory ? "folder" : undefined,
+  };
 }
 
 /** Sort folders before files, then alphabetically by label. */

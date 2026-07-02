@@ -37,7 +37,13 @@ export function shouldAutoWrapProjectPrompt(input: string): boolean {
   const text = input.toLowerCase();
   if (/@[\w./-]+/.test(input)) return true;
 
-  const hasProjectNoun = /\b(repo|repository|project|codebase|local|file|files|folder|folders|structure|src|test|tests|package|readme)\b/.test(text);
-  const hasAction = /\b(check|inspect|read|review|analyze|analyse|find|fix|debug|change|edit|update|add|implement|refactor|optimize|optimise|run|test|verify|qa|explain)\b/.test(text);
+  const hasProjectNoun =
+    /\b(repo|repository|project|codebase|local|file|files|folder|folders|structure|src|test|tests|package|readme)\b/.test(
+      text,
+    );
+  const hasAction =
+    /\b(check|inspect|read|review|analyze|analyse|find|fix|debug|change|edit|update|add|implement|refactor|optimize|optimise|run|test|verify|qa|explain)\b/.test(
+      text,
+    );
   return hasProjectNoun && hasAction;
 }

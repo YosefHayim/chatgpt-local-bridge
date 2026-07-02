@@ -4,7 +4,9 @@ import { SELECTORS } from "../../../../src/features/providers/chatgpt/chatgpt-pa
 describe("ChatGPT page selectors", () => {
   it("includes current account menu selectors used by ChatGPT settings", () => {
     expect(SELECTORS.accountMenuButton).toContain('[data-testid="accounts-profile-button"]');
-    expect(SELECTORS.accountMenuButton).toContain('[role="button"][aria-label*="open profile menu" i]');
+    expect(SELECTORS.accountMenuButton).toContain(
+      '[role="button"][aria-label*="open profile menu" i]',
+    );
   });
 
   it("matches ChatGPT-generated images by estuary content path and generated-image alt", () => {

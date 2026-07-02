@@ -1,6 +1,6 @@
+import { repoPathSuggestions } from "./repo-path-suggestions.ts";
 import type { InputSuggestionGroup, LoadInputSuggestionsOptions } from "./types.ts";
 import { DEFAULT_SUGGESTION_LIMIT } from "./types.ts";
-import { repoPathSuggestions } from "./repo-path-suggestions.ts";
 
 /** Inputs for building a path suggestion group. */
 interface PathSuggestionGroupParams {
@@ -11,7 +11,9 @@ interface PathSuggestionGroupParams {
 }
 
 /** Build a suggestion group for repo path completion. */
-export async function pathSuggestionGroup(params: PathSuggestionGroupParams): Promise<InputSuggestionGroup> {
+export async function pathSuggestionGroup(
+  params: PathSuggestionGroupParams,
+): Promise<InputSuggestionGroup> {
   const limit = params.options.limit ?? DEFAULT_SUGGESTION_LIMIT;
   const matches = await repoPathSuggestions({
     repoRoot: params.options.repoRoot,
@@ -22,6 +24,7 @@ export async function pathSuggestionGroup(params: PathSuggestionGroupParams): Pr
   return {
     ...params.base,
     suggestions: matches,
-    hint: matches.length > 0 ? "Tab inserts the first path. Directories end with /." : params.base.hint,
+    hint:
+      matches.length > 0 ? "Tab inserts the first path. Directories end with /." : params.base.hint,
   };
 }

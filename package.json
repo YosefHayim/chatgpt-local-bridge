@@ -4,12 +4,13 @@
   "description": "Drives ChatGPT or Gemini in Chrome from the terminal; ChatGPT can use sandboxed local repo tools via MCP.",
   "type": "module",
   "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=20"
+  },
   "bin": {
     "bridge": "./dist/bridge.js"
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -20,9 +21,18 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "format": "biome format --write ./",
+    "format:check": "biome format ./",
+    "lint": "biome lint ./",
+    "check:ci": "biome ci ./",
     "check:class-api": "node scripts/check-class-api.mjs",
     "check:jsdoc": "node scripts/check-jsdoc.mjs",
-    "verify:push": "npm run typecheck && npm test && npm run build && npm run check:class-api && npm run check:jsdoc"
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "verify": "pnpm run check:ci && pnpm run typecheck && pnpm test && pnpm run build && pnpm run check:class-api && pnpm run check:jsdoc && pnpm run check:boundaries",
+    "verify:push": "pnpm run verify"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,mjs,json,jsonc}": "biome check --write --no-errors-on-unmatched"
   },
   "keywords": [
     "chatgpt",
@@ -40,16 +50,16 @@
     "commander": "^14.0.3",
     "ink": "^5.1.0",
     "ink-text-input": "^6.0.0",
-    "inquirer": "^13.4.2",
     "playwright": "^1.52.0",
     "react": "^18.3.1",
-    "zod": "^3.24.3"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@types/node": "^22.15.3",
     "@types/react": "^18.3.12",
     "husky": "^9.1.7",
-    "knip": "^6.7.0",
+    "lint-staged": "^15.2.10",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3",
     "vitest": "^3.1.2"

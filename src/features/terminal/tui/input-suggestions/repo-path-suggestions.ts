@@ -1,10 +1,18 @@
 import { readdir } from "node:fs/promises";
 import { extname, sep } from "node:path";
 import { ensureInsideRepo } from "../../../tools/server.ts";
-import type { InputSuggestion } from "./types.ts";
 import { comparePathSuggestions, entryToSuggestion } from "./path-suggestion-utils.ts";
+import type { InputSuggestion } from "./types.ts";
 
-const IGNORED_COMPLETION_ENTRIES = new Set([".git", "node_modules", "dist", "build", "coverage", ".next", ".turbo"]);
+const IGNORED_COMPLETION_ENTRIES = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "build",
+  "coverage",
+  ".next",
+  ".turbo",
+]);
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 
 /** Inputs for listing repo path suggestions. */
@@ -16,10 +24,15 @@ export interface RepoPathSuggestionsParams {
 }
 
 /** List file and folder path suggestions under the repo root. */
-export async function repoPathSuggestions(params: RepoPathSuggestionsParams): Promise<InputSuggestion[]> {
+export async function repoPathSuggestions(
+  params: RepoPathSuggestionsParams,
+): Promise<InputSuggestion[]> {
   const parts = parsePartialPath(params.partial);
   if (!parts) return [];
-  const absoluteSearchDir = resolveSearchDir({ dirPrefix: parts.dirPrefix, repoRoot: params.repoRoot });
+  const absoluteSearchDir = resolveSearchDir({
+    dirPrefix: parts.dirPrefix,
+    repoRoot: params.repoRoot,
+  });
   if (!absoluteSearchDir) return [];
   return listMatchingEntries({ ...params, ...parts, absoluteSearchDir });
 }
@@ -63,7 +76,9 @@ async function listMatchingEntries(params: ListMatchingEntriesParams): Promise<I
       .filter((entry) => isCompletableEntry({ name: entry.name, namePrefix: params.namePrefix }))
       .filter((entry) => matchesKind({ entry, kind: params.kind, namePrefix: params.namePrefix }))
       .map((entry) => entryToSuggestion(entry.name, params.dirPrefix, entry.isDirectory()))
-      .sort((...args: [InputSuggestion, InputSuggestion]) => comparePathSuggestions(args[0], args[1]))
+      .sort((...args: [InputSuggestion, InputSuggestion]) =>
+        comparePathSuggestions(args[0], args[1]),
+      )
       .slice(0, params.limit);
   } catch {
     return [];

@@ -1,6 +1,7 @@
-import type { BridgeConfig, BridgePermissionMode } from "./bridge.types.ts";
-import type { Message } from "./message.types.ts";
+import type { PermissionMode } from "../permissions.ts";
+import type { BridgeConfig } from "./bridge.types.ts";
 import type { ConnectorSetupResult, ModelOption } from "./connector.types.ts";
+import type { Message } from "./message.types.ts";
 
 /** Runtime context passed to slash command handlers. */
 export interface CommandContext {
@@ -34,12 +35,16 @@ export interface CommandContext {
     rewindLastPrompt(replacement?: string): Promise<void>;
     stopResponse(): Promise<boolean>;
     attachFiles?(paths: string[]): Promise<void>;
-    openConnectorSetup?(input: { connectorUrl: string; automatic?: boolean; connectorName?: string }): Promise<ConnectorSetupResult>;
+    openConnectorSetup?(input: {
+      connectorUrl: string;
+      automatic?: boolean;
+      connectorName?: string;
+    }): Promise<ConnectorSetupResult>;
   };
   /** Permission mode controls for tool execution. */
   permission?: {
-    getMode(): BridgePermissionMode;
-    setMode(mode: BridgePermissionMode): void | Promise<void>;
+    getMode(): PermissionMode;
+    setMode(mode: PermissionMode): void | Promise<void>;
   };
   /** Session id persistence helpers. */
   session?: {

@@ -1,19 +1,21 @@
 import { execFile } from "node:child_process";
-import { saveConfig, loadConfig } from "./load-config.ts";
-import { runHooks } from "../user-config/hooks.ts";
-import { normalizePermissionMode, type PermissionMode } from "../domain/permissions.ts";
+import {
+  type ModelProfile,
+  UNKNOWN_MODEL_PROFILE,
+  findModelProfile,
+} from "../domain/models.config.ts";
+import { type PermissionMode, normalizePermissionMode } from "../domain/permissions.ts";
+import type { BridgeConfig, Message } from "../domain/types.ts";
+import { BrowserManager } from "../providers/chrome/browser-manager.ts";
+import { getBrowserProvider, normalizeProvider } from "../providers/create-provider.factory.ts";
 import { resolveFileMentions } from "../store/file-resolver.ts";
 import { appendBridgeLog } from "../store/logging.ts";
+import { ensureBridgeDir, sessionsDir } from "../store/paths.ts";
 import { appendSessionEvent, createSession, updateSession } from "../store/session-store.ts";
-import { sessionsDir, ensureBridgeDir } from "../store/paths.ts";
-import { getBrowserProvider, normalizeProvider } from "../providers/create-provider.factory.ts";
-import { startMcpServer, type McpServerHandle, type McpToolAction } from "../tools/server.ts";
+import { type McpServerHandle, type McpToolAction, startMcpServer } from "../tools/server.ts";
+import { CloudflareTunnel } from "../tunnel/cloudflare-tunnel.ts";
+import { runHooks } from "../user-config/hooks.ts";
 import { loadHooksConfig } from "../user-config/hooks.ts";
-import { CloudflareTunnel } from "../tunnel/cloudflare-tunnel.class.ts";
-import { BrowserManager } from "../providers/chrome/browser-manager.ts";
-import type { BridgeConfig, Message } from "../domain/types.ts";
-import { findModelProfile, UNKNOWN_MODEL_PROFILE, type ModelProfile } from "../domain/models.config.ts";
-import { Orchestrator } from "./orchestrator.ts";
 import type {
   AskEngineInput,
   BuildEngineContext,
@@ -21,6 +23,8 @@ import type {
   ShutdownEngineInput,
   StartEngineOptions,
 } from "./bridge-engine.types.ts";
+import { loadConfig, saveConfig } from "./load-config.ts";
+import { Orchestrator } from "./orchestrator.ts";
 
 /** Build `<tunnelUrl>/mcp`, the URL ChatGPT's connector points at. */
 export function mcpConnectorUrl(tunnelUrl: string): string {
@@ -43,7 +47,10 @@ class ContextCounter {
   private total = 0;
   private profile: ModelProfile;
 
-  constructor(private limit: number, modelName?: string) {
+  constructor(
+    private limit: number,
+    modelName?: string,
+  ) {
     this.profile = modelName ? findModelProfile(modelName) : UNKNOWN_MODEL_PROFILE;
     if (modelName) this.limit = this.profile.contextWindow;
   }
@@ -63,7 +70,8 @@ class ContextCounter {
   add(message: Message): void {
     this.total += MESSAGE_OVERHEAD_TOKENS + this.estimateForProvider(message.content);
     for (const tc of message.toolCalls ?? []) {
-      this.total += MESSAGE_OVERHEAD_TOKENS + this.estimateForProvider(JSON.stringify(tc.arguments));
+      this.total +=
+        MESSAGE_OVERHEAD_TOKENS + this.estimateForProvider(JSON.stringify(tc.arguments));
     }
   }
 
@@ -98,9 +106,8 @@ class ContextCounter {
   }
 
   private estimateForProvider(text: string): number {
-    const charsPerToken = this.profile.provider === "anthropic"
-      ? ANTHROPIC_CHARS_PER_TOKEN
-      : DEFAULT_CHARS_PER_TOKEN;
+    const charsPerToken =
+      this.profile.provider === "anthropic" ? ANTHROPIC_CHARS_PER_TOKEN : DEFAULT_CHARS_PER_TOKEN;
     return estimateTokens(text, charsPerToken);
   }
 }
@@ -151,7 +158,10 @@ interface EngineFeatureFlags {
   withBrowser: boolean | undefined;
 }
 
-function resolveEngineFlags(options: StartEngineOptions, supportsMcpConnector: boolean): EngineFeatureFlags {
+function resolveEngineFlags(
+  options: StartEngineOptions,
+  supportsMcpConnector: boolean,
+): EngineFeatureFlags {
   const withTools = (options.withTools ?? true) && supportsMcpConnector;
   const withTunnel = (options.withTunnel ?? withTools) && supportsMcpConnector;
   return { withTools, withTunnel, withBrowser: options.withBrowser };
@@ -163,14 +173,21 @@ async function initEngineRuntime(
 ): Promise<EngineRuntimeState & { branch?: string }> {
   const sessionStore = { baseDir: sessionsDir(config.repoPath) };
   const branch = await currentGitBranch(config.repoPath);
-  const session = await createSession({
-    repoPath: config.repoPath,
-    model: config.model ?? null,
-    contextLimit: config.contextLimit,
-    tunnelUrl: config.tunnelUrl ?? null,
-  }, sessionStore);
+  const session = await createSession(
+    {
+      repoPath: config.repoPath,
+      model: config.model ?? null,
+      contextLimit: config.contextLimit,
+      tunnelUrl: config.tunnelUrl ?? null,
+    },
+    sessionStore,
+  );
   await runHooks("SessionStart", hooksConfig.hooks).catch(() => []);
-  return { sessionId: session.metadata.id, permissionMode: normalizePermissionMode(config.permissionMode ?? "auto"), branch };
+  return {
+    sessionId: session.metadata.id,
+    permissionMode: normalizePermissionMode(config.permissionMode ?? "auto"),
+    branch,
+  };
 }
 
 async function recordToolAction(input: {
@@ -180,13 +197,17 @@ async function recordToolAction(input: {
   action: McpToolAction;
 }): Promise<void> {
   input.toolActions.push(input.action);
-  await appendSessionEvent(input.getSessionId(), {
-    type: "action",
-    name: input.action.name,
-    status: input.action.status,
-    content: input.action.data?.error ? String(input.action.data.error) : undefined,
-    data: input.action.data,
-  }, input.sessionStore).catch(() => {});
+  await appendSessionEvent(
+    input.getSessionId(),
+    {
+      type: "action",
+      name: input.action.name,
+      status: input.action.status,
+      content: input.action.data?.error ? String(input.action.data.error) : undefined,
+      data: input.action.data,
+    },
+    input.sessionStore,
+  ).catch(() => {});
 }
 
 async function maybeStartMcp(input: {
@@ -203,7 +224,8 @@ async function maybeStartMcp(input: {
   const mcpServer = await startMcpServer(input.config.repoPath, input.config.mcpPort, {
     getPermissionMode: () => input.runtime.permissionMode,
     hooks: input.hooksConfig.hooks,
-    onToolAction: (action) => recordToolAction({ toolActions: input.toolActions, getSessionId, sessionStore, action }),
+    onToolAction: (action) =>
+      recordToolAction({ toolActions: input.toolActions, getSessionId, sessionStore, action }),
   });
   input.log(`MCP:     ${mcpServer.url}`);
   return mcpServer;
@@ -224,12 +246,24 @@ async function loadEngineBootState(options: StartEngineOptions): Promise<EngineB
   const log = resolveEngineLog(options);
   const config = await resolveEngineConfig(options);
   const hooksConfig = await loadHooksConfig({ repoRoot: config.repoPath });
-  const flags = resolveEngineFlags(options, getBrowserProvider(config.provider).supportsMcpConnector);
+  const flags = resolveEngineFlags(
+    options,
+    getBrowserProvider(config.provider).supportsMcpConnector,
+  );
   logHookWarnings(hooksConfig.errors, log);
   const runtime = await initEngineRuntime(config, hooksConfig);
   const toolActions: McpToolAction[] = [];
   const mcpServer = await maybeStartMcp({ config, flags, hooksConfig, runtime, toolActions, log });
-  return { config, hooksConfig, runtime, flags, toolActions, mcpServer, log, getSessionId: () => runtime.sessionId };
+  return {
+    config,
+    hooksConfig,
+    runtime,
+    flags,
+    toolActions,
+    mcpServer,
+    log,
+    getSessionId: () => runtime.sessionId,
+  };
 }
 
 function attachPersistenceListener(input: {
@@ -247,12 +281,16 @@ function attachPersistenceListener(input: {
         type: `chatgpt_${event.message.role}_message`,
         data: { content: event.message.content },
       }).catch(() => {});
-      appendSessionEvent(input.getSessionId(), {
-        type: "message",
-        role: event.message.role,
-        content: event.message.content,
-        data: { messageId: event.message.id },
-      }, sessionStore).catch(() => {});
+      appendSessionEvent(
+        input.getSessionId(),
+        {
+          type: "message",
+          role: event.message.role,
+          content: event.message.content,
+          data: { messageId: event.message.id },
+        },
+        sessionStore,
+      ).catch(() => {});
     }
     if (event.type === "conversation_synced") {
       input.counter.reset();
@@ -264,7 +302,11 @@ function attachPersistenceListener(input: {
       input.config.model = event.model;
       input.config.contextLimit = event.contextLimit;
       saveConfig(input.config).catch(() => {});
-      updateSession(input.getSessionId(), { model: event.model, contextLimit: event.contextLimit }, sessionStore).catch(() => {});
+      updateSession(
+        input.getSessionId(),
+        { model: event.model, contextLimit: event.contextLimit },
+        sessionStore,
+      ).catch(() => {});
     }
   });
 }
@@ -279,12 +321,18 @@ async function startTunnel(input: {
     const tunnelUrl = await tunnel.start(input.config.mcpPort);
     input.config.tunnelUrl = tunnelUrl;
     const connectorUrl = mcpConnectorUrl(tunnelUrl);
-    await updateSession(input.sessionId, { tunnelUrl }, { baseDir: sessionsDir(input.config.repoPath) }).catch(() => {});
+    await updateSession(
+      input.sessionId,
+      { tunnelUrl },
+      { baseDir: sessionsDir(input.config.repoPath) },
+    ).catch(() => {});
     input.log(`Tunnel:  ${tunnelUrl}`);
     input.log(`Connector: ${connectorUrl}`);
     return { tunnel, connectorUrl };
   } catch {
-    input.log("Tunnel: failed to start (cloudflared not installed?). MCP tools require a public URL ChatGPT can reach.");
+    input.log(
+      "Tunnel: failed to start (cloudflared not installed?). MCP tools require a public URL ChatGPT can reach.",
+    );
     return { tunnel: null, connectorUrl: "" };
   }
 }
@@ -309,10 +357,15 @@ async function connectBrowser(input: {
       input.log("Browser: connected.");
     }
     if (input.connectorUrl && provider.supportsMcpConnector) {
-      const result = await input.orchestrator.openConnectorSetup({ connectorUrl: input.connectorUrl, automatic: true });
+      const result = await input.orchestrator.openConnectorSetup({
+        connectorUrl: input.connectorUrl,
+        automatic: true,
+      });
       input.log(`Connector setup: ${result.completed ? "ready" : "needs attention"}`);
     } else if (!provider.supportsMcpConnector) {
-      input.log(`Provider: ${provider.displayName} web has no MCP connector — @file mentions only.`);
+      input.log(
+        `Provider: ${provider.displayName} web has no MCP connector — @file mentions only.`,
+      );
     }
   } catch (err) {
     browser = null;
@@ -326,13 +379,24 @@ async function bootEngine(options: StartEngineOptions): Promise<BuildEngineConte
   const boot = await loadEngineBootState(options);
   const orchestrator = new Orchestrator(boot.config);
   const counter = new ContextCounter(boot.config.contextLimit, boot.config.model);
-  attachPersistenceListener({ orchestrator, counter, config: boot.config, getSessionId: boot.getSessionId });
+  attachPersistenceListener({
+    orchestrator,
+    counter,
+    config: boot.config,
+    getSessionId: boot.getSessionId,
+  });
   const tunnel = boot.flags.withTunnel
     ? await startTunnel({ config: boot.config, sessionId: boot.runtime.sessionId, log: boot.log })
     : { tunnel: null, connectorUrl: "" };
-  const browser = boot.flags.withBrowser === false
-    ? null
-    : await connectBrowser({ orchestrator, connectorUrl: tunnel.connectorUrl, config: boot.config, log: boot.log });
+  const browser =
+    boot.flags.withBrowser === false
+      ? null
+      : await connectBrowser({
+          orchestrator,
+          connectorUrl: tunnel.connectorUrl,
+          config: boot.config,
+          log: boot.log,
+        });
   return {
     config: boot.config,
     orchestrator,
@@ -424,5 +488,9 @@ export class BridgeEngine {
   }
 }
 
-export type { AskEngineInput, ShutdownEngineInput, StartEngineOptions } from "./bridge-engine.types.ts";
+export type {
+  AskEngineInput,
+  ShutdownEngineInput,
+  StartEngineOptions,
+} from "./bridge-engine.types.ts";
 export { ContextCounter };

@@ -1,19 +1,19 @@
+import { type ChildProcess, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { readFile, stat } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { resolve } from "node:path";
 import { McpServer as McpProtocolServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { spawn, type ChildProcess } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { createServer } from "node:http";
-import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFile, stat } from "node:fs/promises";
-import { resolve } from "node:path";
 import type { Page } from "playwright";
 import { z } from "zod";
-import type { ToolDef, ToolResult } from "../domain/types.ts";
-import type { BridgePermissionMode } from "../domain/types.ts";
+import type { PermissionMode } from "../domain/permissions.ts";
 import { evaluateToolPermission, permissionDecisionToToolResult } from "../domain/permissions.ts";
-import { loadManifest } from "../providers/chatgpt/chatgpt-page.class.ts";
+import type { ToolDef, ToolResult } from "../domain/types.ts";
+import { loadManifest } from "../providers/attachments.ts";
 import { createCheckpoint } from "../store/checkpoints.ts";
 import { appendBridgeLog } from "../store/logging.ts";
 import type { HookDefinition } from "../user-config/hooks.ts";
@@ -33,7 +33,7 @@ export interface McpToolAction {
 /** Hooks and callbacks wired into the MCP server. */
 export interface McpServerOptions {
   getPage?: () => Page | null | undefined;
-  getPermissionMode?: () => BridgePermissionMode;
+  getPermissionMode?: () => PermissionMode;
   hooks?: readonly HookDefinition[];
   onToolAction?: (action: McpToolAction) => void | Promise<void>;
 }
@@ -64,7 +64,7 @@ interface StreamableMcpConnection {
 export function ensureInsideRepo(path: string, repoRoot: string): string {
   const resolved = resolve(repoRoot, path);
   const normalizedRoot = resolve(repoRoot);
-  if (resolved !== normalizedRoot && !resolved.startsWith(normalizedRoot + "/")) {
+  if (resolved !== normalizedRoot && !resolved.startsWith(`${normalizedRoot}/`)) {
     throw new Error(`Path escapes repo root: ${path}`);
   }
   return resolved;
@@ -94,7 +94,7 @@ export function isAllowedTestCommand(parts: string[]): boolean {
 /** Trim output to a max character limit. */
 export function trimOutput(text: string, limit = 20_000): string {
   if (text.length <= limit) return text;
-  return text.slice(0, limit) + `\n\n[trimmed: output exceeded ${limit} chars]`;
+  return `${text.slice(0, limit)}\n\n[trimmed: output exceeded ${limit} chars]`;
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ function runProcess(
   options: RunProcessOptions = {},
 ): Promise<ProcessResult> {
   if (args.length === 0) return Promise.resolve({ stdout: "", stderr: "Empty command.", code: 1 });
-  const [command, ...rest] = args;
+  const [command = "", ...rest] = args;
   return spawnProcess({
     command,
     args: rest,
@@ -152,14 +152,23 @@ function attachProcessListeners(input: {
   done: (result: ProcessResult) => void;
 }): void {
   const output = { stdout: "", stderr: "" };
-  const timer = setTimeout(() => { input.proc.kill(); }, input.timeoutMs);
+  const timer = setTimeout(() => {
+    input.proc.kill();
+  }, input.timeoutMs);
   attachProcessOutput({ proc: input.proc, output });
   attachProcessCompletion({ proc: input.proc, timer, output, done: input.done });
 }
 
-function attachProcessOutput(input: { proc: ChildProcess; output: { stdout: string; stderr: string } }): void {
-  input.proc.stdout?.on("data", (chunk: Buffer) => { input.output.stdout += chunk.toString(); });
-  input.proc.stderr?.on("data", (chunk: Buffer) => { input.output.stderr += chunk.toString(); });
+function attachProcessOutput(input: {
+  proc: ChildProcess;
+  output: { stdout: string; stderr: string };
+}): void {
+  input.proc.stdout?.on("data", (chunk: Buffer) => {
+    input.output.stdout += chunk.toString();
+  });
+  input.proc.stderr?.on("data", (chunk: Buffer) => {
+    input.output.stderr += chunk.toString();
+  });
 }
 
 function attachProcessCompletion(input: {
@@ -200,10 +209,18 @@ async function readNumberedSlice(input: ReadFileSliceInput): Promise<{ ok: true;
   const lines = raw.split("\n");
   const start = Math.max(input.startLine - 1, 0);
   const end = Math.min(start + input.maxLines, lines.length);
-  return { ok: true, output: trimOutput(buildNumberedSliceOutput({ lines, start, end, path: input.path })) };
+  return {
+    ok: true,
+    output: trimOutput(buildNumberedSliceOutput({ lines, start, end, path: input.path })),
+  };
 }
 
-function buildNumberedSliceOutput(input: { lines: string[]; start: number; end: number; path: string }): string {
+function buildNumberedSliceOutput(input: {
+  lines: string[];
+  start: number;
+  end: number;
+  path: string;
+}): string {
   const header = `path: ${input.path}\nlines: ${input.start + 1}-${input.end} of ${input.lines.length}\n`;
   return header + formatNumberedLines({ lines: input.lines, start: input.start, end: input.end });
 }
@@ -216,7 +233,9 @@ function formatNumberedLines(input: { lines: string[]; start: number; end: numbe
   return text.endsWith("\n") ? text.slice(0, -1) : text;
 }
 
-async function readFileTool(args: Record<string, unknown>): Promise<{ ok: boolean; output: string }> {
+async function readFileTool(
+  args: Record<string, unknown>,
+): Promise<{ ok: boolean; output: string }> {
   const input = readFileToolInput(args);
   const invalid = await assertReadableFile({ safePath: input.safePath, path: input.path });
   if (invalid) return invalid;
@@ -234,7 +253,10 @@ function readFileToolInput(args: Record<string, unknown>): ReadFileSliceInput {
   };
 }
 
-async function assertReadableFile(input: { safePath: string; path: string }): Promise<{ ok: false; output: string } | null> {
+async function assertReadableFile(input: { safePath: string; path: string }): Promise<{
+  ok: false;
+  output: string;
+} | null> {
   try {
     const fileStat = await stat(input.safePath);
     if (!fileStat.isFile()) return { ok: false, output: `Not a file: ${input.path}` };
@@ -268,8 +290,17 @@ interface BuildRgArgsInput {
 
 function buildRgArgs(input: BuildRgArgsInput): string[] {
   const rgArgs = [
-    "rg", "--line-number", "--hidden",
-    "--glob", "!.git", "--glob", "!node_modules", "--glob", "!dist", "--glob", "!build",
+    "rg",
+    "--line-number",
+    "--hidden",
+    "--glob",
+    "!.git",
+    "--glob",
+    "!node_modules",
+    "--glob",
+    "!dist",
+    "--glob",
+    "!build",
   ];
   if (input.glob) rgArgs.push("--glob", input.glob);
   rgArgs.push(input.pattern, input.safePath);
@@ -300,7 +331,8 @@ function readGrepInput(args: Record<string, unknown>): BuildRgArgsInput & { repo
 
 const grepTool: ToolDef = {
   name: "grep_code",
-  description: "Search the repository using ripgrep. Locate symbols, imports, routes, tests, configs, and references.",
+  description:
+    "Search the repository using ripgrep. Locate symbols, imports, routes, tests, configs, and references.",
   annotations: { title: "Search repo", readOnlyHint: true, openWorldHint: false },
   parameters: {
     pattern: z.string().describe("The ripgrep search pattern."),
@@ -321,21 +353,43 @@ interface ApplyPatchInput {
 }
 
 async function runGitApply(input: ApplyPatchInput): Promise<{ ok: boolean; output: string }> {
-  const check = await runProcess(["git", "apply", "--check", "-"], input.repoRoot, { stdin: input.patch, timeoutMs: 20_000 });
+  const check = await runProcess(["git", "apply", "--check", "-"], input.repoRoot, {
+    stdin: input.patch,
+    timeoutMs: 20_000,
+  });
   if (check.code !== 0) {
-    return { ok: false, output: `Patch check failed:\n${trimOutput(check.stderr || check.stdout)}` };
+    return {
+      ok: false,
+      output: `Patch check failed:\n${trimOutput(check.stderr || check.stdout)}`,
+    };
   }
-  const applied = await runProcess(["git", "apply", "-"], input.repoRoot, { stdin: input.patch, timeoutMs: 20_000 });
+  const applied = await runProcess(["git", "apply", "-"], input.repoRoot, {
+    stdin: input.patch,
+    timeoutMs: 20_000,
+  });
   if (applied.code !== 0) {
-    return { ok: false, output: `Patch apply failed:\n${trimOutput(applied.stderr || applied.stdout)}` };
+    return {
+      ok: false,
+      output: `Patch apply failed:\n${trimOutput(applied.stderr || applied.stdout)}`,
+    };
   }
   return { ok: true, output: "Patch applied successfully." };
 }
 
 async function createPatchCheckpoints(input: ApplyPatchInput): Promise<string> {
   if (input.patchPaths.length === 0) return "";
-  const before = await createCheckpoint({ repoRoot: input.repoRoot, paths: input.patchPaths, phase: "before", label: "apply_patch" });
-  const after = await createCheckpoint({ repoRoot: input.repoRoot, paths: input.patchPaths, phase: "after", label: "apply_patch" });
+  const before = await createCheckpoint({
+    repoRoot: input.repoRoot,
+    paths: input.patchPaths,
+    phase: "before",
+    label: "apply_patch",
+  });
+  const after = await createCheckpoint({
+    repoRoot: input.repoRoot,
+    paths: input.patchPaths,
+    phase: "after",
+    label: "apply_patch",
+  });
   return `\nCheckpoints:\n- before: ${before.id}\n- after: ${after.id}`;
 }
 
@@ -345,7 +399,16 @@ async function applyPatch(args: Record<string, unknown>): Promise<{ ok: boolean;
   const patchPaths = extractPatchPaths(input.patch);
   const applied = await runGitApply({ patch: input.patch, repoRoot: input.repoRoot, patchPaths });
   return applied.ok
-    ? { ok: true, output: applied.output + await createPatchCheckpoints({ patch: input.patch, repoRoot: input.repoRoot, patchPaths }) }
+    ? {
+        ok: true,
+        output:
+          applied.output +
+          (await createPatchCheckpoints({
+            patch: input.patch,
+            repoRoot: input.repoRoot,
+            patchPaths,
+          })),
+      }
     : applied;
 }
 
@@ -358,13 +421,13 @@ export function extractPatchPaths(patch: string): string[] {
   const paths = new Set<string>();
   for (const line of patch.split(/\r?\n/)) {
     const gitMatch = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
-    if (gitMatch) {
+    if (gitMatch && gitMatch[1] !== undefined && gitMatch[2] !== undefined) {
       addPatchPath({ paths, path: gitMatch[1] });
       addPatchPath({ paths, path: gitMatch[2] });
       continue;
     }
     const fileMatch = /^(---|\+\+\+) (?:a|b)\/(.+)$/.exec(line);
-    if (fileMatch) addPatchPath({ paths, path: fileMatch[2] });
+    if (fileMatch && fileMatch[2] !== undefined) addPatchPath({ paths, path: fileMatch[2] });
   }
   return [...paths];
 }
@@ -377,8 +440,15 @@ function addPatchPath(input: { paths: Set<string>; path: string }): void {
 
 const applyPatchTool: ToolDef = {
   name: "apply_patch",
-  description: "Apply a unified diff patch to the repository. Use only after reading the relevant files.",
-  annotations: { title: "Apply patch", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  description:
+    "Apply a unified diff patch to the repository. Use only after reading the relevant files.",
+  annotations: {
+    title: "Apply patch",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
   parameters: { patch: z.string().describe("Unified diff patch compatible with git apply.") },
   handler: applyPatch,
 };
@@ -392,27 +462,43 @@ async function runTests(args: Record<string, unknown>): Promise<{ ok: boolean; o
   const repoRoot = String(args._repoRoot);
   const denied = validateTestCommand({ parts: command.trim().split(/\s+/), command });
   if (denied) return denied;
-  return formatTestResult(await runProcess(command.trim().split(/\s+/), repoRoot, { timeoutMs: 120_000 }));
+  return formatTestResult(
+    await runProcess(command.trim().split(/\s+/), repoRoot, { timeoutMs: 120_000 }),
+  );
 }
 
-function validateTestCommand(input: { parts: string[]; command: string }): { ok: false; output: string } | null {
+function validateTestCommand(input: { parts: string[]; command: string }): {
+  ok: false;
+  output: string;
+} | null {
   if (input.parts.length === 0) return { ok: false, output: "Empty command." };
   if (!isAllowedTestCommand(input.parts)) {
-    return { ok: false, output: `Command not allowlisted: ${input.command}\nAllowed: npm test, pnpm test, pytest, go test ./..., cargo test, make test` };
+    return {
+      ok: false,
+      output: `Command not allowlisted: ${input.command}\nAllowed: npm test, pnpm test, pytest, go test ./..., cargo test, make test`,
+    };
   }
   return null;
 }
 
 function formatTestResult(result: ProcessResult): { ok: boolean; output: string } {
-  const combined = result.stdout + "\n" + result.stderr;
+  const combined = `${result.stdout}\n${result.stderr}`;
   return { ok: result.code === 0, output: trimOutput(combined.trim()) };
 }
 
 const runTestsTool: ToolDef = {
   name: "run_tests",
   description: "Run an allowed project test command (npm test, pytest, go test, etc.).",
-  annotations: { title: "Run tests", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-  parameters: { command: z.string().describe("Allowed test command, e.g. 'npm test' or 'pytest'.") },
+  annotations: {
+    title: "Run tests",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+  parameters: {
+    command: z.string().describe("Allowed test command, e.g. 'npm test' or 'pytest'."),
+  },
   handler: runTests,
 };
 
@@ -457,8 +543,17 @@ interface DownloadResult {
 }
 
 interface AttachmentDownloaderModule {
-  downloadAttachment(page: Page, conversationId: string, id: string, opts?: { outDir?: string }): Promise<unknown>;
-  downloadAll(page: Page, conversationId: string, opts?: { outDir?: string; ids?: string[] }): Promise<unknown>;
+  downloadAttachment(
+    page: Page,
+    conversationId: string,
+    id: string,
+    opts?: { outDir?: string },
+  ): Promise<unknown>;
+  downloadAll(
+    page: Page,
+    conversationId: string,
+    opts?: { outDir?: string; ids?: string[] },
+  ): Promise<unknown>;
 }
 
 function jsonResult(value: unknown): ToolResult {
@@ -501,14 +596,16 @@ function normalizeDownloadAll(value: unknown): DownloadResult[] {
 }
 
 function optionalPage(value: unknown): Page | null {
-  if (typeof value !== "object" || value === null || typeof (value as Page).url !== "function") return null;
+  if (typeof value !== "object" || value === null || typeof (value as Page).url !== "function")
+    return null;
   return value as Page;
 }
 
 function resolveConversationId(args: Record<string, unknown>): string {
-  const explicit = typeof args.conversationId === "string" && args.conversationId.length > 0
-    ? args.conversationId
-    : undefined;
+  const explicit =
+    typeof args.conversationId === "string" && args.conversationId.length > 0
+      ? args.conversationId
+      : undefined;
   if (explicit) return explicit;
   const page = optionalPage(args._page);
   if (!page) throw new Error("No active ChatGPT browser page is available.");
@@ -523,23 +620,32 @@ function resolvePage(args: Record<string, unknown>): Page {
 }
 
 async function loadDownloader(): Promise<AttachmentDownloaderModule> {
-  return await import(DOWNLOADER_MODULE) as AttachmentDownloaderModule;
+  return (await import(DOWNLOADER_MODULE)) as AttachmentDownloaderModule;
 }
 
 /** MCP tool for listing attachments captured in the active ChatGPT conversation. */
 export const listAttachmentsTool: ToolDef = {
   name: "chatgpt_list_attachments",
-  description: "List captured attachments in a ChatGPT conversation, including their assistant/user role.",
+  description:
+    "List captured attachments in a ChatGPT conversation, including their assistant/user role.",
   annotations: { title: "List ChatGPT attachments", readOnlyHint: true, openWorldHint: false },
-  parameters: { conversationId: z.string().optional().describe("Optional ChatGPT conversation id.") },
-  handler: async (args) => jsonResult((await loadManifest(resolveConversationId(args))).attachments),
+  parameters: {
+    conversationId: z.string().optional().describe("Optional ChatGPT conversation id."),
+  },
+  handler: async (args) =>
+    jsonResult((await loadManifest(resolveConversationId(args))).attachments),
 };
 
 /** MCP tool for downloading one captured ChatGPT attachment. */
 export const downloadAttachmentTool: ToolDef = {
   name: "chatgpt_download_attachment",
   description: "Download one captured attachment from the active ChatGPT conversation.",
-  annotations: { title: "Download ChatGPT attachment", readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  annotations: {
+    title: "Download ChatGPT attachment",
+    readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: false,
+  },
   parameters: {
     conversationId: z.string().optional().describe("Optional ChatGPT conversation id."),
     id: z.string().describe("Attachment id from chatgpt_list_attachments."),
@@ -548,7 +654,10 @@ export const downloadAttachmentTool: ToolDef = {
   handler: async (args) => {
     const outDir = optionalString(args.outDir);
     const raw = await (await loadDownloader()).downloadAttachment(
-      resolvePage(args), resolveConversationId(args), String(args.id), outDir ? { outDir } : undefined,
+      resolvePage(args),
+      resolveConversationId(args),
+      String(args.id),
+      outDir ? { outDir } : undefined,
     );
     return jsonResult(normalizeSingleDownloadResult(raw));
   },
@@ -557,8 +666,14 @@ export const downloadAttachmentTool: ToolDef = {
 /** MCP tool for downloading all or selected captured ChatGPT attachments. */
 export const downloadAllAttachmentsTool: ToolDef = {
   name: "chatgpt_download_all",
-  description: "Download all or selected captured attachments from the active ChatGPT conversation.",
-  annotations: { title: "Download all ChatGPT attachments", readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  description:
+    "Download all or selected captured attachments from the active ChatGPT conversation.",
+  annotations: {
+    title: "Download all ChatGPT attachments",
+    readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: false,
+  },
   parameters: {
     conversationId: z.string().optional().describe("Optional ChatGPT conversation id."),
     outDir: z.string().optional().describe("Optional output directory."),
@@ -566,11 +681,17 @@ export const downloadAllAttachmentsTool: ToolDef = {
   },
   handler: async (args) => {
     const outDir = optionalString(args.outDir);
-    const ids = Array.isArray(args.ids) ? args.ids.filter((id): id is string => typeof id === "string") : undefined;
-    const raw = await (await loadDownloader()).downloadAll(resolvePage(args), resolveConversationId(args), {
-      ...(outDir ? { outDir } : {}),
-      ...(ids ? { ids } : {}),
-    });
+    const ids = Array.isArray(args.ids)
+      ? args.ids.filter((id): id is string => typeof id === "string")
+      : undefined;
+    const raw = await (await loadDownloader()).downloadAll(
+      resolvePage(args),
+      resolveConversationId(args),
+      {
+        ...(outDir ? { outDir } : {}),
+        ...(ids ? { ids } : {}),
+      },
+    );
     return jsonResult(normalizeDownloadAll(raw));
   },
 };
@@ -581,7 +702,16 @@ export const downloadAllAttachmentsTool: ToolDef = {
 
 const toolRegistry: Map<string, ToolDef> = new Map();
 
-for (const tool of [grepTool, readFileDef, applyPatchTool, runTestsTool, gitDiffTool, listAttachmentsTool, downloadAttachmentTool, downloadAllAttachmentsTool]) {
+for (const tool of [
+  grepTool,
+  readFileDef,
+  applyPatchTool,
+  runTestsTool,
+  gitDiffTool,
+  listAttachmentsTool,
+  downloadAttachmentTool,
+  downloadAllAttachmentsTool,
+]) {
   toolRegistry.set(tool.name, tool);
 }
 
@@ -652,7 +782,11 @@ async function invokeToolHandler(input: {
       ...(page ? { _page: page } : {}),
     });
   } catch (error) {
-    return { ok: false, output: error instanceof Error ? error.message : String(error), error: "tool-handler-error" };
+    return {
+      ok: false,
+      output: error instanceof Error ? error.message : String(error),
+      error: "tool-handler-error",
+    };
   }
 }
 
@@ -663,8 +797,16 @@ async function logToolCallStart(input: {
   args: Record<string, unknown>;
 }): Promise<void> {
   const clean = sanitizeToolArgs(input.args);
-  await appendBridgeLog({ repoPath: input.repoRoot, type: "mcp_tool_call", data: { name: input.name, args: clean } }).catch(() => {});
-  await input.options.onToolAction?.({ name: input.name, status: "started", data: { args: clean } });
+  await appendBridgeLog({
+    repoPath: input.repoRoot,
+    type: "mcp_tool_call",
+    data: { name: input.name, args: clean },
+  }).catch(() => {});
+  await input.options.onToolAction?.({
+    name: input.name,
+    status: "started",
+    data: { args: clean },
+  });
 }
 
 async function logToolCallEnd(input: {
@@ -675,22 +817,37 @@ async function logToolCallEnd(input: {
   await appendBridgeLog({
     repoPath: input.params.repoRoot,
     type: "mcp_tool_result",
-    data: { name: input.params.name, ok: input.result.ok, outputBytes: input.result.output.length, error: input.result.error },
+    data: {
+      name: input.params.name,
+      ok: input.result.ok,
+      outputBytes: input.result.output.length,
+      error: input.result.error,
+    },
   }).catch(() => {});
   const status = toolActionStatus(input.result, input.blocked);
   await input.params.options.onToolAction?.({
     name: input.params.name,
     status,
-    data: { ok: input.result.ok, error: input.result.error, outputBytes: input.result.output.length },
+    data: {
+      ok: input.result.ok,
+      error: input.result.error,
+      outputBytes: input.result.output.length,
+    },
   });
 }
 
 function createMcpProtocolServer(repoRoot: string, options: McpServerOptions): McpProtocolServer {
   const mcp = new McpProtocolServer({ name: "ai-browser-bridge", version: "0.1.0" });
   for (const [name, tool] of toolRegistry) {
-    mcp.tool(name, tool.description, tool.parameters, tool.annotations ?? {}, async (args: Record<string, unknown>) => {
-      return handleToolCall({ repoRoot, options, name, tool, args });
-    });
+    mcp.tool(
+      name,
+      tool.description,
+      tool.parameters,
+      tool.annotations ?? {},
+      async (args: Record<string, unknown>) => {
+        return handleToolCall({ repoRoot, options, name, tool, args });
+      },
+    );
   }
   return mcp;
 }
@@ -732,11 +889,13 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 }
 
 function writeJsonRpcError(res: ServerResponse, status: number, message: string): void {
-  res.writeHead(status, { "Content-Type": "application/json" }).end(JSON.stringify({
-    jsonrpc: "2.0",
-    error: { code: -32000, message },
-    id: null,
-  }));
+  res.writeHead(status, { "Content-Type": "application/json" }).end(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      error: { code: -32000, message },
+      id: null,
+    }),
+  );
 }
 
 function writeSseProxyFlushPadding(res: ServerResponse): void {
@@ -764,7 +923,9 @@ export class McpServer {
 
   /** Start listening on the given port and return the local base URL. */
   async start(port: number): Promise<string> {
-    this.httpServer = createServer((req, res) => { void this.handleRequest(req, res); });
+    this.httpServer = createServer((req, res) => {
+      void this.handleRequest(req, res);
+    });
     await this.listenOnPort(port);
     return `http://localhost:${port}`;
   }
@@ -816,7 +977,9 @@ export class McpServer {
   }
 
   /** Close every MCP protocol server in a connection map. */
-  private closeAllConnections(connections: Map<string, McpConnection | StreamableMcpConnection>): void {
+  private closeAllConnections(
+    connections: Map<string, McpConnection | StreamableMcpConnection>,
+  ): void {
     for (const connection of connections.values()) connection.server.close().catch(() => {});
     connections.clear();
   }
@@ -850,7 +1013,10 @@ export class McpServer {
   }
 
   /** Route a streamable HTTP MCP request to an existing or new session. */
-  private async handleStreamableHttpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  private async handleStreamableHttpRequest(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
     const sessionId = requestHeader(req.headers["mcp-session-id"]);
     let connection = sessionId ? this.streamableConnections.get(sessionId) : undefined;
     let parsedBody: unknown;
@@ -864,7 +1030,11 @@ export class McpServer {
       await connection.transport.handleRequest(req, res, parsedBody);
     } catch (error) {
       if (!res.headersSent) {
-        writeJsonRpcError(res, 500, error instanceof Error ? error.message : "Internal server error");
+        writeJsonRpcError(
+          res,
+          500,
+          error instanceof Error ? error.message : "Internal server error",
+        );
       }
     }
   }

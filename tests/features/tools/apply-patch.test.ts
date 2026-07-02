@@ -15,11 +15,7 @@ describe("extractPatchPaths", () => {
       "+++ b/README.md",
     ].join("\n");
 
-    expect(extractPatchPaths(patch)).toEqual([
-      "src/old.ts",
-      "src/new.ts",
-      "README.md",
-    ]);
+    expect(extractPatchPaths(patch)).toEqual(["src/old.ts", "src/new.ts", "README.md"]);
   });
 
   it("ignores dev-null patch markers", () => {

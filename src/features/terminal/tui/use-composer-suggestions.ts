@@ -1,7 +1,7 @@
 import { useEffect } from "react";
+import type { AppProps } from "./app-types.ts";
 import { loadInputSuggestions } from "./input-suggestions.ts";
 import type { ComposerState } from "./use-composer-state.ts";
-import type { AppProps } from "./app-types.ts";
 
 /** Loads autocomplete suggestions whenever the composer input changes. */
 export function useComposerSuggestions(state: ComposerState, props: AppProps) {

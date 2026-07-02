@@ -11,7 +11,10 @@ export type ComposerStdinEscapeOptions = {
 export function useComposerStdinEscape(options: ComposerStdinEscapeOptions) {
   useEffect(() => {
     const handleStdinData = (chunk: Buffer | string) => {
-      forwardEscapePresses({ text: chunk.toString(), handleEscapePress: options.handleEscapePress });
+      forwardEscapePresses({
+        text: chunk.toString(),
+        handleEscapePress: options.handleEscapePress,
+      });
     };
     process.stdin.on("data", handleStdinData);
     return () => {

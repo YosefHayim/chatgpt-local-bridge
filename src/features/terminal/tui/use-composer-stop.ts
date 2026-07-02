@@ -1,7 +1,7 @@
 import { useCallback } from "react";
+import type { AppProps } from "./app-types.ts";
 import { isDoubleEscapePress } from "./shortcuts.ts";
 import type { ComposerState } from "./use-composer-state.ts";
-import type { AppProps } from "./app-types.ts";
 
 /** Options for stop and escape handling. */
 export type ComposerStopOptions = {
@@ -29,7 +29,8 @@ function useStopFromShortcut(options: ComposerStopOptions) {
 function runStopShortcut(input: { state: ComposerState; orchestrator: AppProps["orchestrator"] }) {
   input.state.refs.stopShortcutRunning.current = true;
   input.state.setStatus("Stopping ChatGPT...");
-  input.orchestrator.stopResponse()
+  input.orchestrator
+    .stopResponse()
     .then((stopped) => {
       input.state.setStatus(stopped ? "Stopped active response." : "No active response to stop.");
     })
@@ -46,17 +47,24 @@ function runStopShortcut(input: { state: ComposerState; orchestrator: AppProps["
 
 function useHandleEscapePress(options: ComposerStopOptions & { stopFromShortcut: () => void }) {
   const { state, stopFromShortcut } = options;
-  return useCallback((now = Date.now()) => {
-    if (handleDoubleEscape({ state, stopFromShortcut, now })) return;
-    if (state.mode === "command-list") {
-      state.setMode("typing");
-      return;
-    }
-    state.setStatus("Press Esc again to stop ChatGPT");
-  }, [state, stopFromShortcut]);
+  return useCallback(
+    (now = Date.now()) => {
+      if (handleDoubleEscape({ state, stopFromShortcut, now })) return;
+      if (state.mode === "command-list") {
+        state.setMode("typing");
+        return;
+      }
+      state.setStatus("Press Esc again to stop ChatGPT");
+    },
+    [state, stopFromShortcut],
+  );
 }
 
-function handleDoubleEscape(input: { state: ComposerState; stopFromShortcut: () => void; now: number }) {
+function handleDoubleEscape(input: {
+  state: ComposerState;
+  stopFromShortcut: () => void;
+  now: number;
+}) {
   if (!isDoubleEscapePress(input.state.refs.lastEscapeAt.current, input.now)) {
     input.state.refs.lastEscapeAt.current = input.now;
     return false;

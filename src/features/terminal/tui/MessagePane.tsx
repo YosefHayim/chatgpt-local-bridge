@@ -34,9 +34,10 @@ function MessageRow(props: MessageRowProps) {
       <Text>
         <Text color={theme.color} backgroundColor={theme.backgroundColor} bold>
           {theme.prefix} {theme.label}:{" "}
+        </Text>{" "}
+        <Text color={theme.color} backgroundColor={theme.backgroundColor}>
+          {preview}
         </Text>
-        {" "}
-        <Text color={theme.color} backgroundColor={theme.backgroundColor}>{preview}</Text>
       </Text>
       {renderToolCalls(props.message)}
     </Box>

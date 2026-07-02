@@ -1,6 +1,6 @@
 import type { CommandContext } from "../../domain/types.ts";
-import { buildProjectTaskPromptWithInstructions } from "../cli-runner.class.ts";
 import { loadProjectInstructions } from "../../user-config/hooks.ts";
+import { buildProjectTaskPromptWithInstructions } from "../cli-runner.class.ts";
 import { shouldAutoWrapProjectPrompt } from "./role-theme.config.ts";
 
 /** Options for building a project-aware prompt. */

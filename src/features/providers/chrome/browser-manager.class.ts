@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 import type { Conversation } from "../../domain/types.ts";
 import { bridgeDir, chromeProfileDir } from "../../store/paths.ts";
 import type { BrowserProvider } from "../browser-provider.types.ts";
-import { getBrowserProvider, type BridgeProviderId } from "../create-provider.factory.ts";
+import { type BridgeProviderId, getBrowserProvider } from "../create-provider.factory.ts";
 
 /** Chrome remote-debugging port the bridge attaches to / spawns on. */
 export const BRIDGE_DEBUG_PORT = 9222;
@@ -17,12 +17,18 @@ const CDP_URL = `http://127.0.0.1:${BRIDGE_DEBUG_PORT}`;
 const execFileAsync = promisify(execFile);
 
 /** Parse `--user-data-dir=` from the Chrome process bound to a debug port. */
-export async function getUserDataDirOnDebugPort(port: number = BRIDGE_DEBUG_PORT): Promise<string | null> {
+export async function getUserDataDirOnDebugPort(
+  port: number = BRIDGE_DEBUG_PORT,
+): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync("ps", ["ax", "-o", "command="]);
     const needle = `--remote-debugging-port=${port}`;
     for (const line of stdout.split("\n")) {
-      if (!line.includes(needle) || !line.includes("Google Chrome.app/Contents/MacOS/Google Chrome")) continue;
+      if (
+        !line.includes(needle) ||
+        !line.includes("Google Chrome.app/Contents/MacOS/Google Chrome")
+      )
+        continue;
       const match = line.match(/--user-data-dir=([^\s]+)/);
       if (match?.[1]) return match[1];
     }
@@ -71,8 +77,10 @@ export class BrowserAttachError extends Error {
 }
 
 /** Whether localhost responds on the Chrome remote debugging port. */
-export async function isDebugPortListening(input: { port?: number } | number = {}): Promise<boolean> {
-  const port = typeof input === "number" ? input : input.port ?? BRIDGE_DEBUG_PORT;
+export async function isDebugPortListening(
+  input: { port?: number } | number = {},
+): Promise<boolean> {
+  const port = typeof input === "number" ? input : (input.port ?? BRIDGE_DEBUG_PORT);
   try {
     const resp = await fetch(`http://127.0.0.1:${port}/json/version`);
     return resp.ok;
@@ -112,13 +120,17 @@ function prepareProfileDirectories(repoPath: string, profileDir: string): void {
 }
 
 function spawnChrome(profileDir: string, defaultUrl: string): void {
-  const child = spawn(CHROME_BIN, [
-    `--user-data-dir=${profileDir}`,
-    `--remote-debugging-port=${BRIDGE_DEBUG_PORT}`,
-    "--no-first-run",
-    "--no-default-browser-check",
-    defaultUrl,
-  ], { detached: true, stdio: "ignore" });
+  const child = spawn(
+    CHROME_BIN,
+    [
+      `--user-data-dir=${profileDir}`,
+      `--remote-debugging-port=${BRIDGE_DEBUG_PORT}`,
+      "--no-first-run",
+      "--no-default-browser-check",
+      defaultUrl,
+    ],
+    { detached: true, stdio: "ignore" },
+  );
   child.unref();
 }
 
@@ -135,7 +147,9 @@ function chromeAlreadyRunningError(): BrowserAttachError {
 }
 
 function spawnReadyError(): BrowserAttachError {
-  return new BrowserAttachError(`Chrome started but debug port ${BRIDGE_DEBUG_PORT} did not become ready.`);
+  return new BrowserAttachError(
+    `Chrome started but debug port ${BRIDGE_DEBUG_PORT} did not become ready.`,
+  );
 }
 
 interface CdpConnectState {
@@ -144,7 +158,10 @@ interface CdpConnectState {
   page: Page | null;
 }
 
-function findProviderPage(browser: Browser, provider: BrowserProvider): { context: BrowserContext; page: Page } | null {
+function findProviderPage(
+  browser: Browser,
+  provider: BrowserProvider,
+): { context: BrowserContext; page: Page } | null {
   for (const ctx of browser.contexts()) {
     for (const page of ctx.pages()) {
       if (page.url().includes(provider.origin)) return { context: ctx, page };
@@ -175,24 +192,35 @@ function wireSafeDialogHandlersForContext(context: BrowserContext): void {
   context.on("page", (page) => wireSafeDialogHandlers(page));
 }
 
-function interceptResponses(context: BrowserContext, providerId: string, conversations: Conversation[]): void {
+function interceptResponses(
+  context: BrowserContext,
+  providerId: string,
+  conversations: Conversation[],
+): void {
   context.on("response", (response: Response) => {
     if (providerId !== "chatgpt") return;
     void parseChatGptConversations(response, conversations).catch(() => {});
   });
 }
 
-async function parseChatGptConversations(response: Response, conversations: Conversation[]): Promise<void> {
+async function parseChatGptConversations(
+  response: Response,
+  conversations: Conversation[],
+): Promise<void> {
   const url = response.url();
   if (!url.includes("/backend-api/conversations?")) return;
   const body = await response.json().catch(() => null);
   const items = body?.items;
   if (!Array.isArray(items)) return;
-  conversations.splice(0, conversations.length, ...items.map((item: Record<string, unknown>) => ({
-    id: String(item.id),
-    title: String(item.title ?? "Untitled"),
-    url: `https://chatgpt.com/c/${item.id}`,
-  })));
+  conversations.splice(
+    0,
+    conversations.length,
+    ...items.map((item: Record<string, unknown>) => ({
+      id: String(item.id),
+      title: String(item.title ?? "Untitled"),
+      url: `https://chatgpt.com/c/${item.id}`,
+    })),
+  );
 }
 
 async function tryConnectOverCdp(input: {
@@ -229,9 +257,16 @@ async function connectOnceOverCdp(input: {
       input.state.page = found.page;
       console.error(`  Connected to running Chrome, found ${input.provider.origin} tab.`);
     } else {
-      input.state.context = input.state.browser.contexts()[0]!;
-      input.state.page = await input.state.context.newPage();
-      console.error(`  Connected to running Chrome, no ${input.provider.origin} tab — opening one.`);
+      const [firstContext] = input.state.browser.contexts();
+      if (!firstContext) {
+        await input.close();
+        return false;
+      }
+      input.state.context = firstContext;
+      input.state.page = await firstContext.newPage();
+      console.error(
+        `  Connected to running Chrome, no ${input.provider.origin} tab — opening one.`,
+      );
     }
     return Boolean(input.state.page);
   } catch {
@@ -251,7 +286,10 @@ export class BrowserManager {
   readonly attachedViaCdp = { value: false };
   readonly spawnedNew = { value: false };
 
-  constructor(private readonly repoPath: string = process.cwd(), providerId: BridgeProviderId = "chatgpt") {
+  constructor(
+    private readonly repoPath: string = process.cwd(),
+    providerId: BridgeProviderId = "chatgpt",
+  ) {
     this.providerId = providerId;
     this.provider = getBrowserProvider(providerId);
   }
@@ -365,7 +403,10 @@ export class BrowserManager {
   }
 
   /** Retry CDP attach until a provider page is available. */
-  private async connectExisting(opts?: { attempts?: number; intervalMs?: number }): Promise<boolean> {
+  private async connectExisting(opts?: {
+    attempts?: number;
+    intervalMs?: number;
+  }): Promise<boolean> {
     const state = this.cdpState();
     const connected = await tryConnectOverCdp({
       state,
@@ -383,8 +424,10 @@ export class BrowserManager {
   /** Wire response listeners and navigate after a successful CDP attach. */
   private finalizeCdpConnection(state: CdpConnectState): void {
     this.applyCdpState(state);
-    wireSafeDialogHandlersForContext(this.context!);
-    interceptResponses(this.context!, this.providerId, this.conversations);
-    void navigateIfNeeded(this.page!, this.provider);
+    const { context, page } = state;
+    if (!context || !page) return;
+    wireSafeDialogHandlersForContext(context);
+    interceptResponses(context, this.providerId, this.conversations);
+    void navigateIfNeeded(page, this.provider);
   }
 }

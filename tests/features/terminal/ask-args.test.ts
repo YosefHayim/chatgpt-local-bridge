@@ -33,7 +33,9 @@ function parseAsk(argv: string[]): AskCall {
   program.exitOverride();
   registerCliCommands(program, stubRunner(calls));
   program.parse(["node", "bridge", "ask", ...argv]);
-  return calls[0]!;
+  const [call] = calls;
+  if (!call) throw new Error("expected runAsk to be invoked exactly once");
+  return call;
 }
 
 describe("bridge ask argument wiring", () => {

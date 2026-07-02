@@ -1,6 +1,6 @@
-import type { ContextCounter } from "../../bridge/bridge-engine.class.ts";
-import type { AppProps } from "./app-types.ts";
+import type { ContextCounter } from "../../bridge/create-engine.factory.ts";
 import type { StatusBarProps } from "./StatusBar.tsx";
+import type { AppProps } from "./app-types.ts";
 
 /** Resolved display values for the status bar. */
 interface StatusBarDisplay {
@@ -26,7 +26,9 @@ export function buildStatusBarProps(options: {
     shortModel: truncateText({ value: counter.modelLabel, maxLength: 10 }),
     displayPermissionMode: display.displayPermissionMode,
     displayToolCallCount: display.displayToolCallCount,
-    shortBranch: display.displayBranch ? truncateText({ value: display.displayBranch, maxLength: 8 }) : "nogit",
+    shortBranch: display.displayBranch
+      ? truncateText({ value: display.displayBranch, maxLength: 8 })
+      : "nogit",
     displaySessionId: display.displaySessionId ? display.displaySessionId.slice(0, 8) : "nosess",
   };
 }
@@ -34,7 +36,8 @@ export function buildStatusBarProps(options: {
 /** Resolve permission, tool, branch, and session labels for the status bar. */
 function resolveStatusBarDisplay(props: AppProps): StatusBarDisplay {
   return {
-    displayPermissionMode: props.permission?.getMode() ?? props.permissionMode ?? props.config.permissionMode ?? "auto",
+    displayPermissionMode:
+      props.permission?.getMode() ?? props.permissionMode ?? props.config.permissionMode ?? "auto",
     displayToolCallCount: props.statusline?.toolCallCount() ?? props.toolCallCount ?? 0,
     displayBranch: props.statusline?.branch ?? props.branch,
     displaySessionId: props.session?.getId() ?? props.sessionId,

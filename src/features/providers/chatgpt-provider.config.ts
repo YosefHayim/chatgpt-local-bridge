@@ -1,5 +1,5 @@
-import { ChatGptPage } from "./chatgpt/chatgpt-page.class.ts";
 import type { BrowserProvider } from "./browser-provider.types.ts";
+import { ChatGptPage } from "./chatgpt/chatgpt-page.class.ts";
 
 const chatGptPage = new ChatGptPage();
 

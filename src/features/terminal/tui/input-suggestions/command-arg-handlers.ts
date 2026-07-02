@@ -1,8 +1,16 @@
 import { withFilteredSuggestions } from "./filter-suggestions.ts";
-import { activeArgumentToken, hasTrailingWhitespace, splitArgs } from "./parse-slash-input.ts";
+import { type activeArgumentToken, hasTrailingWhitespace, splitArgs } from "./parse-slash-input.ts";
 import { pathSuggestionGroup } from "./path-suggestions.ts";
-import { checkpointSuggestions, rewindFlagSuggestions, sessionSuggestions } from "./session-checkpoint-suggestions.ts";
-import type { InputSuggestionGroup, LoadInputSuggestionsOptions, ParsedSlashInput } from "./types.ts";
+import {
+  checkpointSuggestions,
+  rewindFlagSuggestions,
+  sessionSuggestions,
+} from "./session-checkpoint-suggestions.ts";
+import type {
+  InputSuggestionGroup,
+  LoadInputSuggestionsOptions,
+  ParsedSlashInput,
+} from "./types.ts";
 
 /** Inputs for export/restore/rewind argument suggestion handlers. */
 interface CommandArgHandlerParams {
@@ -13,7 +21,9 @@ interface CommandArgHandlerParams {
 }
 
 /** Suggest session ids or output path hint for /export. */
-export async function exportArgumentSuggestions(params: CommandArgHandlerParams): Promise<InputSuggestionGroup> {
+export async function exportArgumentSuggestions(
+  params: CommandArgHandlerParams,
+): Promise<InputSuggestionGroup> {
   const tokens = splitArgs(params.slash.args);
   if (tokens.length === 0 || (tokens.length === 1 && !hasTrailingWhitespace(params.slash.args))) {
     return withFilteredSuggestions({
@@ -23,11 +33,16 @@ export async function exportArgumentSuggestions(params: CommandArgHandlerParams)
       limit: params.options.limit,
     });
   }
-  return { ...params.base, hint: "Type the export output path. Supported extensions: .md, .json, .jsonl." };
+  return {
+    ...params.base,
+    hint: "Type the export output path. Supported extensions: .md, .json, .jsonl.",
+  };
 }
 
 /** Suggest checkpoint ids or repo paths for /restore. */
-export async function restoreArgumentSuggestions(params: CommandArgHandlerParams): Promise<InputSuggestionGroup> {
+export async function restoreArgumentSuggestions(
+  params: CommandArgHandlerParams,
+): Promise<InputSuggestionGroup> {
   const tokens = splitArgs(params.slash.args);
   if (tokens.length === 0 || (tokens.length === 1 && !hasTrailingWhitespace(params.slash.args))) {
     return withFilteredSuggestions({
@@ -37,11 +52,18 @@ export async function restoreArgumentSuggestions(params: CommandArgHandlerParams
       limit: params.options.limit,
     });
   }
-  return pathSuggestionGroup({ base: params.base, partial: params.token.value, options: params.options, kind: "all" });
+  return pathSuggestionGroup({
+    base: params.base,
+    partial: params.token.value,
+    options: params.options,
+    kind: "all",
+  });
 }
 
 /** Suggest rewind flags or checkpoint ids for /rewind and /retry. */
-export async function rewindArgumentSuggestions(params: CommandArgHandlerParams): Promise<InputSuggestionGroup> {
+export async function rewindArgumentSuggestions(
+  params: CommandArgHandlerParams,
+): Promise<InputSuggestionGroup> {
   const tokens = splitArgs(params.slash.args);
   const firstToken = tokens[0];
   if (shouldSuggestCheckpoints({ tokens, args: params.slash.args, firstToken })) {
@@ -57,7 +79,8 @@ async function resolveRewindArgumentSuggestions(input: {
   firstToken: string | undefined;
 }): Promise<InputSuggestionGroup> {
   if (input.tokens.length <= 1) return rewindFlagSuggestionGroup(input.params);
-  if (input.firstToken === "--files" || input.firstToken === "--both") return checkpointFilteredSuggestions(input.params);
+  if (input.firstToken === "--files" || input.firstToken === "--both")
+    return checkpointFilteredSuggestions(input.params);
   return input.params.base;
 }
 
@@ -77,12 +100,16 @@ function shouldSuggestCheckpoints(input: {
   args: string;
   firstToken: string | undefined;
 }): boolean {
-  return (input.firstToken === "--files" || input.firstToken === "--both")
-    && (input.tokens.length > 1 || hasTrailingWhitespace(input.args));
+  return (
+    (input.firstToken === "--files" || input.firstToken === "--both") &&
+    (input.tokens.length > 1 || hasTrailingWhitespace(input.args))
+  );
 }
 
 /** Filter checkpoint suggestions for rewind restore steps. */
-async function checkpointFilteredSuggestions(params: CommandArgHandlerParams): Promise<InputSuggestionGroup> {
+async function checkpointFilteredSuggestions(
+  params: CommandArgHandlerParams,
+): Promise<InputSuggestionGroup> {
   return withFilteredSuggestions({
     group: params.base,
     suggestions: await checkpointSuggestions(params.options),

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { CommandContext } from "../../../src/features/domain/types.ts";
 import {
   buildProjectTaskPrompt,
   buildProjectTaskPromptWithInstructions,
 } from "../../../src/features/terminal/cli-runner.class.ts";
-import type { CommandContext } from "../../../src/features/domain/types.ts";
 
 // The prompt builders read only ctx.config.repoPath; a minimal stub is enough.
 const ctx = { config: { repoPath: "/repo" } } as unknown as CommandContext;

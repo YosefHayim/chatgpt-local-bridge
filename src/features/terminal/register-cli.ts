@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import type { Command } from "commander";
 import { CliRunner, runDownload } from "./cli-runner.class.ts";
 import { subcommandOpts } from "./subcommand-opts.ts";
 
@@ -25,7 +25,10 @@ function registerHeadlessCommands(program: Command, runner: CliRunner): void {
     .option("-p, --port <number>", "MCP server port")
     .option("--provider <name>", "Browser provider: chatgpt or gemini (default: chatgpt)")
     .option("--json", "Emit a JSON object { sessionId, model, reply, contextTokens }")
-    .option("--tools", "Start the tunnel + connector so ChatGPT can call local tools (ChatGPT only)")
+    .option(
+      "--tools",
+      "Start the tunnel + connector so ChatGPT can call local tools (ChatGPT only)",
+    )
     .option("--fresh", "Start a new conversation before asking")
     .option("--conversation <idOrUrl>", "Open a ChatGPT conversation by id or URL before asking")
     .option("--model <name>", "Switch model before asking")
@@ -44,14 +47,20 @@ function registerHeadlessCommands(program: Command, runner: CliRunner): void {
     .option("--scan", "Rescan conversation attachments into manifest without downloading")
     .option("--json", "Emit a JSON array of results")
     .action((...args: unknown[]) => handleDownloadAction(args));
-  program.command("sessions").description("List stored bridge sessions as JSON").action(() => runner.runSessions());
+  program
+    .command("sessions")
+    .description("List stored bridge sessions as JSON")
+    .action(() => runner.runSessions());
   program
     .command("login")
     .description("Open the bridge Chrome profile to sign in once")
     .option("-r, --repo <path>", "Target repository for the bridge Chrome profile")
     .option("--provider <name>", "Browser provider: chatgpt or gemini (default: chatgpt)")
     .action((...args: unknown[]) => handleLoginAction(args, runner));
-  program.command("stop").description("Close the warm bridge browser").action(() => runner.runStop());
+  program
+    .command("stop")
+    .description("Close the warm bridge browser")
+    .action(() => runner.runStop());
 }
 
 /** Run default `bridge` TUI from Commander action arguments. */

@@ -1,10 +1,10 @@
-import { randomUUID, createHash } from "node:crypto";
-import { mkdir, readdir, readFile, writeFile, appendFile, rm, stat } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join, relative, resolve, sep, dirname } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
-import type { BridgeProviderId } from "../providers/create-provider.factory.ts";
+import { appendFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { hasErrorCode } from "../domain/errors.ts";
+import type { BridgeProviderId } from "../providers/create-provider.factory.ts";
 import { ensureInsideRepo } from "../tools/server.ts";
 
 // ---------------------------------------------------------------------------
@@ -270,9 +270,12 @@ interface ChromeProfileInput {
 }
 
 /** Isolated Chrome user-data directory for the signed-in provider session. */
-export function chromeProfileDir(input: ChromeProfileInput | string, provider: BridgeProviderId = "chatgpt"): string {
+export function chromeProfileDir(
+  input: ChromeProfileInput | string,
+  provider: BridgeProviderId = "chatgpt",
+): string {
   const repoPath = typeof input === "string" ? input : input.repoPath;
-  const providerId = typeof input === "string" ? provider : input.provider ?? "chatgpt";
+  const providerId = typeof input === "string" ? provider : (input.provider ?? "chatgpt");
   const dirName = providerId === "gemini" ? "chrome-profile-gemini" : "chrome-profile";
   return join(bridgeDir(repoPath), dirName);
 }
@@ -370,17 +373,26 @@ function readString(record: Record<string, unknown>, key: string, source: string
   return value;
 }
 
-function readOptionalString(record: Record<string, unknown>, key: string, source: string): string | undefined {
+function readOptionalString(
+  record: Record<string, unknown>,
+  key: string,
+  source: string,
+): string | undefined {
   const value = record[key];
   if (value === undefined) return undefined;
   if (typeof value !== "string") throw new Error(`Expected ${key} to be a string in ${source}`);
   return value;
 }
 
-function readNullableString(record: Record<string, unknown>, key: string, source: string): string | null {
+function readNullableString(
+  record: Record<string, unknown>,
+  key: string,
+  source: string,
+): string | null {
   const value = record[key];
   if (value === null) return null;
-  if (typeof value !== "string") throw new Error(`Expected ${key} to be a string or null in ${source}`);
+  if (typeof value !== "string")
+    throw new Error(`Expected ${key} to be a string or null in ${source}`);
   return value;
 }
 
@@ -412,7 +424,11 @@ function metadataFromObject(record: Record<string, unknown>, source: string): Se
   };
 }
 
-function applyOptionalEventFields(event: SessionEvent, record: Record<string, unknown>, source: string): void {
+function applyOptionalEventFields(
+  event: SessionEvent,
+  record: Record<string, unknown>,
+  source: string,
+): void {
   const role = readOptionalString(record, "role", source);
   if (role !== undefined) event.role = normalizeRole(role, source);
   for (const field of ["name", "status", "content"] as const) {
@@ -484,7 +500,10 @@ async function readSessionDirEntries(baseDir: string): Promise<Dirent[]> {
 // Session build / update / list
 // ---------------------------------------------------------------------------
 
-function buildSessionMetadata(input: CreateSessionInput, options: SessionStoreOptions): SessionMetadata {
+function buildSessionMetadata(
+  input: CreateSessionInput,
+  options: SessionStoreOptions,
+): SessionMetadata {
   const id = normalizeSessionId(input.id ?? getCreateId(options)());
   const startedAt = normalizeTimestamp(input.startedAt ?? getNow(options)());
   const updatedAt = normalizeTimestamp(input.updatedAt ?? startedAt);
@@ -499,7 +518,10 @@ function buildSessionMetadata(input: CreateSessionInput, options: SessionStoreOp
   };
 }
 
-function buildSessionEvent(input: AppendSessionEventInput, options: SessionStoreOptions): SessionEvent {
+function buildSessionEvent(
+  input: AppendSessionEventInput,
+  options: SessionStoreOptions,
+): SessionEvent {
   return {
     id: normalizeSessionEventId(input.id ?? getCreateId(options)()),
     type: input.type,
@@ -521,13 +543,18 @@ function mergeSessionMetadata(
     ...current,
     ...(input.repoPath !== undefined ? { repoPath: input.repoPath } : {}),
     ...(input.model !== undefined ? { model: input.model } : {}),
-    ...(input.contextLimit !== undefined ? { contextLimit: normalizeContextLimit(input.contextLimit) } : {}),
+    ...(input.contextLimit !== undefined
+      ? { contextLimit: normalizeContextLimit(input.contextLimit) }
+      : {}),
     ...(input.tunnelUrl !== undefined ? { tunnelUrl: input.tunnelUrl } : {}),
     updatedAt: normalizeTimestamp(input.updatedAt ?? getNow(options)()),
   };
 }
 
-async function initSessionDir(metadata: SessionMetadata, options: SessionStoreOptions): Promise<void> {
+async function initSessionDir(
+  metadata: SessionMetadata,
+  options: SessionStoreOptions,
+): Promise<void> {
   const paths = sessionPaths(metadata.id, options);
   await mkdir(paths.baseDir, { recursive: true });
   await mkdir(paths.sessionDir);
@@ -547,7 +574,10 @@ async function persistAppendedEvent(input: {
   });
 }
 
-async function tryReadSessionMetadata(baseDir: string, entry: Dirent): Promise<SessionMetadata | null> {
+async function tryReadSessionMetadata(
+  baseDir: string,
+  entry: Dirent,
+): Promise<SessionMetadata | null> {
   if (!entry.isDirectory() || !SAFE_SESSION_ID.test(entry.name)) return null;
   try {
     return await readMetadata(join(baseDir, entry.name, METADATA_FILE));
@@ -557,7 +587,10 @@ async function tryReadSessionMetadata(baseDir: string, entry: Dirent): Promise<S
   }
 }
 
-async function collectSessionMetadata(baseDir: string, entries: Dirent[]): Promise<SessionMetadata[]> {
+async function collectSessionMetadata(
+  baseDir: string,
+  entries: Dirent[],
+): Promise<SessionMetadata[]> {
   const sessions: SessionMetadata[] = [];
   for (const entry of entries) {
     const metadata = await tryReadSessionMetadata(baseDir, entry);
@@ -580,12 +613,15 @@ function eventDetail(event: SessionEvent): string {
 
 function formatTranscriptEvent(event: SessionEvent): string {
   const prefix = `[${event.createdAt}]`;
-  if (event.type === "message") return `${prefix} ${event.role ?? "message"}: ${event.content ?? ""}`;
+  if (event.type === "message")
+    return `${prefix} ${event.role ?? "message"}: ${event.content ?? ""}`;
   if (event.type === "action") {
     const name = event.name ? ` ${event.name}` : "";
     const status = event.status ? ` ${event.status}` : "";
     const detail = eventDetail(event);
-    return detail ? `${prefix} action${name}${status}: ${detail}` : `${prefix} action${name}${status}`;
+    return detail
+      ? `${prefix} action${name}${status}: ${detail}`
+      : `${prefix} action${name}${status}`;
   }
   const label = [event.type, event.name, event.status].filter(Boolean).join(" ");
   const detail = eventDetail(event);
@@ -596,9 +632,15 @@ function formatTranscript(events: SessionEvent[]): string {
   return events.map(formatTranscriptEvent).join("\n");
 }
 
-async function loadSessionRecord(sessionId: string, options: SessionStoreOptions): Promise<SessionRecord> {
+async function loadSessionRecord(
+  sessionId: string,
+  options: SessionStoreOptions,
+): Promise<SessionRecord> {
   const paths = sessionPaths(sessionId, options);
-  return { metadata: await readMetadata(paths.metadataPath), events: await readEvents(paths.eventsPath) };
+  return {
+    metadata: await readMetadata(paths.metadataPath),
+    events: await readEvents(paths.eventsPath),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -613,7 +655,10 @@ function toPosixPath(path: string): string {
   return path.split(sep).join("/");
 }
 
-function checkpointStorageRoot(repoRoot: string, checkpointRoot = checkpointsDir(repoRoot)): string {
+function checkpointStorageRoot(
+  repoRoot: string,
+  checkpointRoot = checkpointsDir(repoRoot),
+): string {
   return join(checkpointRoot, sha256(resolve(repoRoot)).slice(0, 16));
 }
 
@@ -675,7 +720,9 @@ function buildCheckpointPaths(ctx: {
   return { id, checkpointDir, filesDir: join(checkpointDir, "files") };
 }
 
-function buildCreateCheckpointContext(options: CreateCheckpointOptions): CreateCheckpointBuildContext {
+function buildCreateCheckpointContext(
+  options: CreateCheckpointOptions,
+): CreateCheckpointBuildContext {
   const repoRoot = resolve(options.repoRoot);
   const phase = defaultPhase(options.phase);
   const createdAt = (options.now ?? new Date()).toISOString();
@@ -684,11 +731,24 @@ function buildCreateCheckpointContext(options: CreateCheckpointOptions): CreateC
   return { ...base, ...buildCheckpointPaths({ ...base, checkpointRoot: options.checkpointRoot }) };
 }
 
-function buildCheckpointRecord(ctx: CreateCheckpointBuildContext, files: Checkpoint["files"]): Checkpoint {
-  return { id: ctx.id, repoRoot: ctx.repoRoot, createdAt: ctx.createdAt, phase: ctx.phase, label: ctx.label, files };
+function buildCheckpointRecord(
+  ctx: CreateCheckpointBuildContext,
+  files: Checkpoint["files"],
+): Checkpoint {
+  return {
+    id: ctx.id,
+    repoRoot: ctx.repoRoot,
+    createdAt: ctx.createdAt,
+    phase: ctx.phase,
+    label: ctx.label,
+    files,
+  };
 }
 
-function buildSelectedPaths(repoRoot: string, paths: readonly string[] | undefined): Set<string> | undefined {
+function buildSelectedPaths(
+  repoRoot: string,
+  paths: readonly string[] | undefined,
+): Set<string> | undefined {
   if (!paths) return undefined;
   return new Set(paths.map((path) => resolveRepoPath(repoRoot, path).relativePath));
 }
@@ -723,8 +783,10 @@ async function writeFileSnapshot(
 async function snapshotFile(repoPath: RepoPath, filesDir: string): Promise<CheckpointFileSnapshot> {
   const fileStat = await tryStat(repoPath);
   if (!fileStat) return { relativePath: repoPath.relativePath, exists: false, size: 0 };
-  if (fileStat.isDirectory()) throw new Error(`Cannot checkpoint directory: ${repoPath.relativePath}`);
-  if (!fileStat.isFile()) throw new Error(`Cannot checkpoint non-file path: ${repoPath.relativePath}`);
+  if (fileStat.isDirectory())
+    throw new Error(`Cannot checkpoint directory: ${repoPath.relativePath}`);
+  if (!fileStat.isFile())
+    throw new Error(`Cannot checkpoint non-file path: ${repoPath.relativePath}`);
   return writeFileSnapshot(repoPath, filesDir, fileStat);
 }
 
@@ -737,16 +799,25 @@ async function readCheckpoint(checkpointDir: string): Promise<Checkpoint | undef
   }
 }
 
-async function writeCheckpointFiles(ctx: CreateCheckpointBuildContext): Promise<Checkpoint["files"]> {
+async function writeCheckpointFiles(
+  ctx: CreateCheckpointBuildContext,
+): Promise<Checkpoint["files"]> {
   await mkdir(ctx.filesDir, { recursive: true });
   const files = [];
   for (const repoPath of ctx.resolvedPaths) files.push(await snapshotFile(repoPath, ctx.filesDir));
   return files;
 }
 
-async function persistCheckpoint(ctx: CreateCheckpointBuildContext, files: Checkpoint["files"]): Promise<Checkpoint> {
+async function persistCheckpoint(
+  ctx: CreateCheckpointBuildContext,
+  files: Checkpoint["files"],
+): Promise<Checkpoint> {
   const checkpoint = buildCheckpointRecord(ctx, files);
-  await writeFile(checkpointMetadataPath(ctx.checkpointDir), JSON.stringify(checkpoint, null, 2), "utf-8");
+  await writeFile(
+    checkpointMetadataPath(ctx.checkpointDir),
+    JSON.stringify(checkpoint, null, 2),
+    "utf-8",
+  );
   return checkpoint;
 }
 
@@ -759,7 +830,10 @@ async function readCheckpointDirEntries(storeRoot: string): Promise<Dirent[]> {
   }
 }
 
-async function tryReadCheckpointSummary(storeRoot: string, entry: Dirent): Promise<CheckpointSummary | null> {
+async function tryReadCheckpointSummary(
+  storeRoot: string,
+  entry: Dirent,
+): Promise<CheckpointSummary | null> {
   if (!entry.isDirectory()) return null;
   const checkpoint = await readCheckpoint(join(storeRoot, entry.name));
   if (!checkpoint) return null;
@@ -772,7 +846,10 @@ async function tryReadCheckpointSummary(storeRoot: string, entry: Dirent): Promi
   };
 }
 
-async function collectCheckpointSummaries(storeRoot: string, entries: Dirent[]): Promise<CheckpointSummary[]> {
+async function collectCheckpointSummaries(
+  storeRoot: string,
+  entries: Dirent[],
+): Promise<CheckpointSummary[]> {
   const checkpoints: CheckpointSummary[] = [];
   for (const entry of entries) {
     const summary = await tryReadCheckpointSummary(storeRoot, entry);
@@ -783,7 +860,8 @@ async function collectCheckpointSummaries(storeRoot: string, entries: Dirent[]):
 
 function sortCheckpointSummaries(checkpoints: CheckpointSummary[]): CheckpointSummary[] {
   return checkpoints.sort(
-    (left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id),
+    (left, right) =>
+      right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id),
   );
 }
 
@@ -794,7 +872,8 @@ async function restoreExistingFile(input: {
   target: RepoPath;
   restored: string[];
 }): Promise<void> {
-  if (!input.file.snapshotRef) throw new Error(`Checkpoint file is missing snapshot data: ${input.file.relativePath}`);
+  if (!input.file.snapshotRef)
+    throw new Error(`Checkpoint file is missing snapshot data: ${input.file.relativePath}`);
   const snapshotPath = resolveInside(input.checkpointDir, join("files", input.file.snapshotRef));
   const contents = await readFile(snapshotPath);
   await mkdir(dirname(input.target.absolutePath), { recursive: true });
@@ -818,7 +897,10 @@ async function restoreFile(input: {
   input.removed.push(target.relativePath);
 }
 
-function validateSelectedPaths(checkpoint: Checkpoint, selectedPaths: Set<string> | undefined): void {
+function validateSelectedPaths(
+  checkpoint: Checkpoint,
+  selectedPaths: Set<string> | undefined,
+): void {
   if (!selectedPaths) return;
   for (const selectedPath of selectedPaths) {
     if (!checkpoint.files.some((file) => file.relativePath === selectedPath)) {
@@ -837,7 +919,13 @@ async function restoreAllFiles(input: {
   const removed: string[] = [];
   for (const file of input.checkpoint.files) {
     if (input.selectedPaths && !input.selectedPaths.has(file.relativePath)) continue;
-    await restoreFile({ repoRoot: input.repoRoot, checkpointDir: input.checkpointDir, file, restored, removed });
+    await restoreFile({
+      repoRoot: input.repoRoot,
+      checkpointDir: input.checkpointDir,
+      file,
+      restored,
+      removed,
+    });
   }
   validateSelectedPaths(input.checkpoint, input.selectedPaths);
   return { checkpointId: input.checkpoint.id, restored, removed };
@@ -858,9 +946,17 @@ async function readMentionContent(absPath: string, rawPath: string): Promise<str
   }
 }
 
-function buildMentionResult(input: { prompt: string; match: string; relPath: string; content: string }) {
+function buildMentionResult(input: {
+  prompt: string;
+  match: string;
+  relPath: string;
+  content: string;
+}) {
   const block = `\n--- @${input.relPath} ---\n${input.content}\n--- end @${input.relPath} ---\n`;
-  return { prompt: input.prompt.replace(input.match, block), file: { relPath: input.relPath, content: input.content } };
+  return {
+    prompt: input.prompt.replace(input.match, block),
+    file: { relPath: input.relPath, content: input.content },
+  };
 }
 
 async function resolveOneFileMention(input: {
@@ -869,9 +965,14 @@ async function resolveOneFileMention(input: {
   prompt: string;
 }): Promise<{ prompt: string; file?: ResolvedFile }> {
   const rawPath = input.match[1];
+  if (rawPath === undefined) return { prompt: input.prompt };
   const absPath = resolve(input.repoRoot, rawPath);
   const relPath = relative(input.repoRoot, absPath);
-  if (!ensureInsideRepo(absPath, input.repoRoot)) return { prompt: input.prompt };
+  try {
+    ensureInsideRepo(absPath, input.repoRoot);
+  } catch {
+    return { prompt: input.prompt };
+  }
   const content = await readMentionContent(absPath, rawPath);
   return buildMentionResult({ prompt: input.prompt, match: input.match[0], relPath, content });
 }
@@ -937,7 +1038,10 @@ export class SessionStore {
   /** Load session metadata and events from disk. */
   async loadSession(id: string): Promise<SessionRecord> {
     const paths = sessionPaths(id, this.options);
-    return { metadata: await readMetadata(paths.metadataPath), events: await readEvents(paths.eventsPath) };
+    return {
+      metadata: await readMetadata(paths.metadataPath),
+      events: await readEvents(paths.eventsPath),
+    };
   }
 
   /** List all sessions sorted by most recent activity. */
@@ -969,12 +1073,18 @@ export class SessionStore {
 // ---------------------------------------------------------------------------
 
 /** Create a new session directory with empty event log. */
-export async function createSession(input: CreateSessionInput, options: SessionStoreOptions = {}): Promise<SessionRecord> {
+export async function createSession(
+  input: CreateSessionInput,
+  options: SessionStoreOptions = {},
+): Promise<SessionRecord> {
   return new SessionStore(options).createSession(input);
 }
 
 /** Load session metadata and events from disk. */
-export async function loadSession(id: string, options: SessionStoreOptions = {}): Promise<SessionRecord> {
+export async function loadSession(
+  id: string,
+  options: SessionStoreOptions = {},
+): Promise<SessionRecord> {
   return new SessionStore(options).loadSession(id);
 }
 
@@ -1005,14 +1115,24 @@ export async function updateSession(
 }
 
 /** Export a session with transcript, JSON, and JSONL formats. */
-export async function exportSession(sessionId: string, options: SessionStoreOptions = {}): Promise<SessionExport> {
+export async function exportSession(
+  sessionId: string,
+  options: SessionStoreOptions = {},
+): Promise<SessionExport> {
   const record = await loadSessionRecord(sessionId, options);
   const jsonl = await readRawEvents(sessionPaths(sessionId, options).eventsPath);
-  return { ...record, transcript: formatTranscript(record.events), json: `${JSON.stringify(record, null, 2)}\n`, jsonl };
+  return {
+    ...record,
+    transcript: formatTranscript(record.events),
+    json: `${JSON.stringify(record, null, 2)}\n`,
+    jsonl,
+  };
 }
 
 /** Return the most recently updated session, or null when none exist. */
-export async function getLatestSession(options: SessionStoreOptions = {}): Promise<SessionRecord | null> {
+export async function getLatestSession(
+  options: SessionStoreOptions = {},
+): Promise<SessionRecord | null> {
   const baseDir = resolveBaseDir(options);
   const entries = await readSessionDirEntries(baseDir);
   const [latest] = sortSessionsByActivity(await collectSessionMetadata(baseDir, entries));
@@ -1027,16 +1147,26 @@ export async function createCheckpoint(options: CreateCheckpointOptions): Promis
 }
 
 /** List checkpoints for a repository. */
-export async function listCheckpoints(options: ListCheckpointsOptions): Promise<CheckpointSummary[]> {
+export async function listCheckpoints(
+  options: ListCheckpointsOptions,
+): Promise<CheckpointSummary[]> {
   const storeRoot = checkpointStorageRoot(options.repoRoot, options.checkpointRoot);
-  const summaries = await collectCheckpointSummaries(storeRoot, await readCheckpointDirEntries(storeRoot));
+  const summaries = await collectCheckpointSummaries(
+    storeRoot,
+    await readCheckpointDirEntries(storeRoot),
+  );
   return sortCheckpointSummaries(summaries);
 }
 
 /** Restore all or selected files from a checkpoint. */
-export async function restoreCheckpoint(options: RestoreCheckpointOptions): Promise<RestoreCheckpointResult> {
+export async function restoreCheckpoint(
+  options: RestoreCheckpointOptions,
+): Promise<RestoreCheckpointResult> {
   const repoRoot = resolve(options.repoRoot);
-  const checkpointDir = join(checkpointStorageRoot(repoRoot, options.checkpointRoot), options.checkpointId);
+  const checkpointDir = join(
+    checkpointStorageRoot(repoRoot, options.checkpointRoot),
+    options.checkpointId,
+  );
   const checkpoint = await readCheckpoint(checkpointDir);
   if (!checkpoint) throw new Error(`Checkpoint not found: ${options.checkpointId}`);
   return restoreAllFiles({
@@ -1049,7 +1179,9 @@ export async function restoreCheckpoint(options: RestoreCheckpointOptions): Prom
 
 /** Extract repo-relative @file mentions from terminal input. */
 export function extractFileMentions(input: string): string[] {
-  const mentions = [...input.matchAll(FILE_MENTION_RE)].map((match) => match[1]);
+  const mentions = [...input.matchAll(FILE_MENTION_RE)]
+    .map((match) => match[1])
+    .filter((mention): mention is string => mention !== undefined);
   return [...new Set(mentions)];
 }
 

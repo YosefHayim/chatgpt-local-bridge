@@ -25,10 +25,12 @@ function makeEngine(order: string[], options: { stopRejects?: boolean } = {}) {
 }
 
 /** A `(code: number) => never` that throws a sentinel so the test process keeps running. */
-const fakeExit = (order: string[]): ((code: number) => never) => (code) => {
-  order.push(`exit:${code}`);
-  throw new ExitSignal(code);
-};
+const fakeExit =
+  (order: string[]): ((code: number) => never) =>
+  (code) => {
+    order.push(`exit:${code}`);
+    throw new ExitSignal(code);
+  };
 
 describe("abortAndExit", () => {
   it("aborts, shuts down without closing the browser, then exits — in that order", async () => {

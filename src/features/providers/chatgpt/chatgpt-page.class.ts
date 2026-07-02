@@ -1,6 +1,6 @@
-import type { Locator, Page, APIResponse } from "playwright";
-import path from "node:path";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
+import type { APIResponse, Locator, Page } from "playwright";
 import type {
   Attachment,
   AttachmentManifest,
@@ -10,31 +10,18 @@ import type {
   ModelOption,
 } from "../../domain/types.ts";
 import type { BrowserProvider } from "../browser-provider.types.ts";
-import {
-  conversationUrlFromIdOrUrl,
-  isSameChatGptConversation,
-} from "../conversation-url.ts";
+import { conversationUrlFromIdOrUrl, isSameChatGptConversation } from "../conversation-url.ts";
+import { GuestSessionError } from "../guest-session-error.ts";
 
 /** True when an unknown error is a Node.js ErrnoException with a code field. */
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === "object" && error !== null && "code" in error;
 }
 
-/** Thrown when ChatGPT shows the unauthenticated guest shell. */
-export class GuestSessionError extends Error {
-  constructor() {
-    super(
-      "ChatGPT is not signed in. "
-        + "This is the bridge's isolated Chrome — not your daily browser. "
-        + "Click Log in in that window, complete sign-in, leave it open, then run again.",
-    );
-    this.name = "GuestSessionError";
-  }
-}
+// GuestSessionError is shared across providers; see ../guest-session-error.ts.
+export { GuestSessionError };
 
 // --- actions/attach-files-to-prompt.ts ---
-
-
 
 /** Attach local files to the ChatGPT composer when the browser UI exposes file upload. */
 async function attachFilesToPrompt(page: Page, paths: string[]): Promise<void> {
@@ -43,9 +30,7 @@ async function attachFilesToPrompt(page: Page, paths: string[]): Promise<void> {
   await attachFilesViaChooser({ page, paths });
 }
 
-
 // --- actions/attach-files-via-chooser.ts ---
-
 
 /** Context for {@link openAttachmentFileChooser}. */
 interface OpenAttachmentFileChooserContext {
@@ -55,12 +40,15 @@ interface OpenAttachmentFileChooserContext {
 
 /** Open the attachment file chooser via the composer attach button. */
 async function openAttachmentFileChooser(ctx: OpenAttachmentFileChooserContext) {
-  const attachButton = await firstVisible({ page: ctx.page, selectors: [
-    'button[aria-label*="Attach" i]',
-    'button[aria-label*="Upload" i]',
-    'button[data-testid*="attach" i]',
-    'button[data-testid*="upload" i]',
-  ] });
+  const attachButton = await firstVisible({
+    page: ctx.page,
+    selectors: [
+      'button[aria-label*="Attach" i]',
+      'button[aria-label*="Upload" i]',
+      'button[data-testid*="attach" i]',
+      'button[data-testid*="upload" i]',
+    ],
+  });
   if (!attachButton) throw new Error("Could not find ChatGPT attachment control.");
   const chooserPromise = ctx.page.waitForEvent("filechooser", { timeout: 5_000 });
   await attachButton.click();
@@ -81,9 +69,7 @@ async function attachFilesViaChooser(ctx: AttachFilesViaChooserContext): Promise
   await (await chooser).setFiles(ctx.paths);
 }
 
-
 // --- actions/attach-files-via-input.ts ---
-
 
 /** Context for {@link attachFilesViaInput}. */
 interface AttachFilesViaInputContext {
@@ -96,14 +82,12 @@ interface AttachFilesViaInputContext {
 /** Attach files through a visible file input when one exists. */
 async function attachFilesViaInput(ctx: AttachFilesViaInputContext): Promise<boolean> {
   const input = ctx.page.locator(SELECTORS.attachmentInput).first();
-  if (await input.count() === 0) return false;
+  if ((await input.count()) === 0) return false;
   await input.setInputFiles(ctx.paths);
   return true;
 }
 
-
 // --- actions/build-prepared-rewind-turn.ts ---
-
 
 /** Context for {@link buildPreparedRewindTurn}. */
 interface BuildPreparedRewindTurnContext {
@@ -120,7 +104,9 @@ interface BuildPreparedRewindTurnContext {
 }
 
 /** Build prepared rewind state from loaded baseline values. */
-async function buildPreparedRewindTurn(ctx: BuildPreparedRewindTurnContext): Promise<PreparedRewindTurn> {
+async function buildPreparedRewindTurn(
+  ctx: BuildPreparedRewindTurnContext,
+): Promise<PreparedRewindTurn> {
   const turnScope = await resolveLastUserTurnScope({ lastUserBlock: ctx.lastUserBlock });
   const prompt = resolveRewindPrompt({
     replacement: ctx.replacement,
@@ -135,7 +121,6 @@ async function buildPreparedRewindTurn(ctx: BuildPreparedRewindTurnContext): Pro
   };
 }
 
-
 // --- actions/load-last-user-block.ts ---
 
 /** Context for {@link loadLastUserBlock}. */
@@ -147,13 +132,12 @@ interface LoadLastUserBlockContext {
 /** Load the last user message block or throw when none exist. */
 async function loadLastUserBlock(ctx: LoadLastUserBlockContext) {
   const blocks = await ctx.page.locator(SELECTORS.userBlock).all();
-  if (blocks.length === 0) throw new Error("No user message found to rewind.");
-  return blocks[blocks.length - 1];
+  const last = blocks[blocks.length - 1];
+  if (last === undefined) throw new Error("No user message found to rewind.");
+  return last;
 }
 
-
 // --- actions/open-rewind-editor.ts ---
-
 
 /** Context for {@link clickRewindEditButton}. */
 interface ClickRewindEditButtonContext {
@@ -182,13 +166,7 @@ async function openRewindEditor(ctx: OpenRewindEditorContext) {
   return findRewindEditor({ page: ctx.prepared.page, turnScope: ctx.prepared.turnScope });
 }
 
-
 // --- actions/prepare-rewind-turn.ts ---
-
-
-
-
-
 
 /** Load the last user block and baseline counts for a rewind operation. */
 async function prepareRewindTurn(ctx: PrepareRewindTurnContext): Promise<PreparedRewindTurn> {
@@ -204,11 +182,7 @@ async function prepareRewindTurn(ctx: PrepareRewindTurnContext): Promise<Prepare
   });
 }
 
-
 // --- actions/rewind-controls.ts ---
-
-
-
 
 /** Context for {@link findRewindEditButton}. */
 interface FindRewindEditButtonContext {
@@ -231,8 +205,10 @@ interface FindRewindEditorContext {
 
 /** Find the editable prompt field after clicking edit. */
 async function findRewindEditor(ctx: FindRewindEditorContext) {
-  return firstVisibleIn({ parent: ctx.turnScope, selectors: EDITOR_SELECTORS })
-    ?? firstVisible({ page: ctx.page, selectors: EDITOR_SELECTORS });
+  return (
+    firstVisibleIn({ parent: ctx.turnScope, selectors: EDITOR_SELECTORS }) ??
+    firstVisible({ page: ctx.page, selectors: EDITOR_SELECTORS })
+  );
 }
 
 /** Context for {@link findRewindSubmitButton}. */
@@ -245,8 +221,10 @@ interface FindRewindSubmitButtonContext {
 
 /** Find the submit button for an edited prompt. */
 async function findRewindSubmitButton(ctx: FindRewindSubmitButtonContext) {
-  return firstVisibleIn({ parent: ctx.turnScope, selectors: SUBMIT_BUTTON_SELECTORS })
-    ?? firstVisible({ page: ctx.page, selectors: SUBMIT_BUTTON_SELECTORS });
+  return (
+    firstVisibleIn({ parent: ctx.turnScope, selectors: SUBMIT_BUTTON_SELECTORS }) ??
+    firstVisible({ page: ctx.page, selectors: SUBMIT_BUTTON_SELECTORS })
+  );
 }
 
 /** Context for {@link submitRewindEditor}. */
@@ -264,11 +242,7 @@ async function submitRewindEditor(ctx: SubmitRewindEditorContext): Promise<void>
   await ctx.editor.dispatchEvent("input").catch(() => {});
 }
 
-
 // --- actions/rewind-helpers.ts ---
-
-
-
 
 /** Context for {@link resolveLastUserTurnScope}. */
 interface ResolveLastUserTurnScopeContext {
@@ -278,8 +252,10 @@ interface ResolveLastUserTurnScopeContext {
 
 /** Resolve the conversation turn scope for hovering edit controls. */
 async function resolveLastUserTurnScope(ctx: ResolveLastUserTurnScopeContext): Promise<Locator> {
-  const turn = ctx.lastUserBlock.locator('xpath=ancestor::section[starts-with(@data-testid, "conversation-turn-")][1]');
-  return (await turn.count() > 0) ? turn : ctx.lastUserBlock;
+  const turn = ctx.lastUserBlock.locator(
+    'xpath=ancestor::section[starts-with(@data-testid, "conversation-turn-")][1]',
+  );
+  return (await turn.count()) > 0 ? turn : ctx.lastUserBlock;
 }
 
 /** Edit-button selectors scoped to a user turn. */
@@ -337,17 +313,13 @@ function resolveRewindPrompt(ctx: ResolveRewindPromptContext): string {
   return prompt;
 }
 
-
 // --- actions/rewind-last-user-prompt.ts ---
-
-
 
 /** Edit the last user message and submit it again, optionally replacing its content. */
 async function rewindLastUserPrompt(page: Page, replacement?: string): Promise<void> {
   const prepared = await prepareRewindTurn({ page, replacement });
   await submitRewindTurn({ prepared });
 }
-
 
 // --- actions/rewind.types.ts ---
 
@@ -373,9 +345,7 @@ interface PrepareRewindTurnContext {
   replacement?: string;
 }
 
-
 // --- actions/stop-generating.ts ---
-
 
 /** Stop the active streaming response when ChatGPT exposes the stop button. */
 async function stopGenerating(page: Page, timeout = 5_000): Promise<boolean> {
@@ -389,10 +359,7 @@ async function stopGenerating(page: Page, timeout = 5_000): Promise<boolean> {
   return true;
 }
 
-
 // --- actions/submit-edited-rewind-turn.ts ---
-
-
 
 /** Context for {@link submitEditedRewindTurn}. */
 interface SubmitEditedRewindTurnContext {
@@ -414,7 +381,6 @@ async function submitEditedRewindTurn(ctx: SubmitEditedRewindTurnContext): Promi
   });
 }
 
-
 // --- actions/submit-rewind-turn.ts ---
 
 /** Context for {@link submitRewindTurn}. */
@@ -431,9 +397,7 @@ async function submitRewindTurn(ctx: SubmitRewindTurnContext): Promise<void> {
   await submitEditedRewindTurn({ prepared: ctx.prepared });
 }
 
-
 // --- attachments/assign-attachments-resolve.ts ---
-
 
 /** Resolve one attachment candidate to a stable id, reusing existing records when possible. */
 function resolveAttachment(ctx: {
@@ -453,7 +417,10 @@ function resolveAttachment(ctx: {
   return createAttachment(ctx);
 }
 
-function reuseExisting(params: { ctx: { usedExistingIds: Set<string> }; existing: Attachment }): Attachment {
+function reuseExisting(params: {
+  ctx: { usedExistingIds: Set<string> };
+  existing: Attachment;
+}): Attachment {
   params.ctx.usedExistingIds.add(params.existing.id);
   return params.existing;
 }
@@ -479,18 +446,24 @@ function findExistingAttachment(ctx: {
   params: { role: AttachmentRole; messageIndex: number; existing: Attachment[] };
   usedExistingIds: Set<string>;
 }): Attachment | undefined {
-  return ctx.params.existing.find((attachment) =>
-    !ctx.usedExistingIds.has(attachment.id)
-    && attachment.role === ctx.params.role
-    && attachment.messageIndex === ctx.params.messageIndex
-    && attachment.kind === ctx.item.kind
-    && attachment.url === ctx.item.url,
+  return ctx.params.existing.find(
+    (attachment) =>
+      !ctx.usedExistingIds.has(attachment.id) &&
+      attachment.role === ctx.params.role &&
+      attachment.messageIndex === ctx.params.messageIndex &&
+      attachment.kind === ctx.item.kind &&
+      attachment.url === ctx.item.url,
   );
 }
 
 function buildAttachment(ctx: {
   item: ExtractedContent["attachments"][number];
-  params: { role: AttachmentRole; messageIndex: number; counters: AttachmentCounters; createdAt: string };
+  params: {
+    role: AttachmentRole;
+    messageIndex: number;
+    counters: AttachmentCounters;
+    createdAt: string;
+  };
 }): Attachment {
   const suffix = ctx.params.counters[ctx.params.role][ctx.item.kind];
   return {
@@ -502,16 +475,17 @@ function buildAttachment(ctx: {
   };
 }
 
-function attachmentId(params: { role: AttachmentRole; kind: AttachmentKind; suffix: number }): string {
-  return params.role === "user" ? `user-${params.kind}-${params.suffix}` : `${params.kind}-${params.suffix}`;
+function attachmentId(params: {
+  role: AttachmentRole;
+  kind: AttachmentKind;
+  suffix: number;
+}): string {
+  return params.role === "user"
+    ? `user-${params.kind}-${params.suffix}`
+    : `${params.kind}-${params.suffix}`;
 }
 
-
 // --- attachments/assign-attachments.ts ---
-
-
-
-
 
 /** Register extracted assistant content and persist new attachment ids. */
 async function registerExtractedContent(params: {
@@ -580,18 +554,17 @@ function markerFor(index: number): string {
   return `${MARKER_PREFIX}${index}${MARKER_SUFFIX}`;
 }
 
-
 // --- attachments/attachment-types.ts ---
 
 /** Minimal DOM snapshot used by the attachment walker. */
 type DomSnapshotNode =
   | { type: "text"; text: string }
   | {
-    type: "element";
-    tagName: string;
-    attributes: Record<string, string>;
-    children: DomSnapshotNode[];
-  };
+      type: "element";
+      tagName: string;
+      attributes: Record<string, string>;
+      children: DomSnapshotNode[];
+    };
 
 /** Attachment kind inferred from a DOM element. */
 type AttachmentKind = Attachment["kind"];
@@ -635,7 +608,6 @@ const MARKER_PREFIX = "\u0000attachment:";
 
 /** Marker suffix used while walking snapshots before ids are assigned. */
 const MARKER_SUFFIX = "\u0000";
-
 
 // --- attachments/dom-snapshot.dom-snippet.ts ---
 const DOM_SNAPSHOT_HELPERS_SOURCE = String.raw`
@@ -792,11 +764,7 @@ const ALL_MESSAGES_SNAPSHOT_SOURCE = String.raw`
 })()
 `;
 
-
 // --- attachments/download-attachment.ts ---
-
-
-
 
 /** Download one attachment from a conversation manifest. */
 async function downloadAttachment(
@@ -807,8 +775,15 @@ async function downloadAttachment(
 ): Promise<DownloadResult> {
   const manifest = await loadManifest(conversationId);
   const attachment = manifest.attachments.find((item: Attachment) => item.id === id);
-  if (!attachment) throw new AttachmentDownloadError(id, undefined, `Attachment not found in manifest: ${id}`);
-  return downloadResolvedAttachment({ page, conversationId, attachment, attachments: manifest.attachments, opts });
+  if (!attachment)
+    throw new AttachmentDownloadError(id, undefined, `Attachment not found in manifest: ${id}`);
+  return downloadResolvedAttachment({
+    page,
+    conversationId,
+    attachment,
+    attachments: manifest.attachments,
+    opts,
+  });
 }
 
 /** Download all or selected attachments sequentially. */
@@ -821,7 +796,12 @@ async function downloadAll(
   const ids = opts.ids ?? manifest.attachments.map((attachment: Attachment) => attachment.id);
   const results = await downloadIds({ page, conversationId, ids, opts });
   if (results.length > 0 && results.every((result) => result.error)) {
-    throw new AttachmentDownloadError(opts.ids?.join(",") ?? "*", undefined, `Failed to download all attachments for conversation ${conversationId}`, results);
+    throw new AttachmentDownloadError(
+      opts.ids?.join(",") ?? "*",
+      undefined,
+      `Failed to download all attachments for conversation ${conversationId}`,
+      results,
+    );
   }
   return results;
 }
@@ -835,20 +815,37 @@ interface DownloadResolvedInput {
 }
 
 async function downloadResolvedAttachment(input: DownloadResolvedInput): Promise<DownloadResult> {
-  const outDir = outputDirectory({ conversationId: input.conversationId, outDir: input.opts.outDir });
+  const outDir = outputDirectory({
+    conversationId: input.conversationId,
+    outDir: input.opts.outDir,
+  });
   await mkdir(outDir, { recursive: true });
   try {
     if (isHttpUrl(input.attachment.url)) {
-      return await downloadHttpAttachment({ page: input.page, attachment: input.attachment, outDir, attachments: input.attachments });
+      return await downloadHttpAttachment({
+        page: input.page,
+        attachment: input.attachment,
+        outDir,
+        attachments: input.attachments,
+      });
     }
-    const filePath = await resolveDownloadPath({ outDir, attachment: input.attachment, attachments: input.attachments });
+    const filePath = await resolveDownloadPath({
+      outDir,
+      attachment: input.attachment,
+      attachments: input.attachments,
+    });
     const bytes = input.attachment.url.startsWith("blob:")
       ? await fetchBlobBytes({ page: input.page, attachment: input.attachment })
       : parseDataUrl({ attachment: input.attachment });
     return await writeIfChanged({ filePath, bytes });
   } catch (error) {
     if (error instanceof AttachmentDownloadError) throw error;
-    throw new AttachmentDownloadError(input.attachment.id, input.attachment.url, `Failed to download attachment ${input.attachment.id}`, error);
+    throw new AttachmentDownloadError(
+      input.attachment.id,
+      input.attachment.url,
+      `Failed to download attachment ${input.attachment.id}`,
+      error,
+    );
   }
 }
 
@@ -865,15 +862,27 @@ async function downloadIds(input: DownloadIdsInput): Promise<DownloadAllResult[]
   return results;
 }
 
-async function downloadOneId(input: { input: DownloadIdsInput; attachmentId: string }): Promise<DownloadAllResult> {
+async function downloadOneId(input: {
+  input: DownloadIdsInput;
+  attachmentId: string;
+}): Promise<DownloadAllResult> {
   try {
-    const result = await downloadAttachment(input.input.page, input.input.conversationId, input.attachmentId, input.input.opts);
+    const result = await downloadAttachment(
+      input.input.page,
+      input.input.conversationId,
+      input.attachmentId,
+      input.input.opts,
+    );
     return { id: input.attachmentId, ...result };
   } catch (error) {
-    return { id: input.attachmentId, path: "", bytes: 0, error: error instanceof Error ? error.message : String(error) };
+    return {
+      id: input.attachmentId,
+      path: "",
+      bytes: 0,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
-
 
 // --- attachments/download-attachment.types.ts ---
 /** Error raised when an attachment cannot be resolved or downloaded. */
@@ -921,10 +930,7 @@ interface DownloadAllOptions extends DownloadOptions {
   ids?: string[];
 }
 
-
 // --- attachments/download-filename.core.ts ---
-
-
 
 interface ParseDataUrlInput {
   /** Attachment whose url is a data: URI. */
@@ -954,12 +960,12 @@ interface SanitizeFilenameInput {
   value: string | undefined;
 }
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally strips control characters from filename candidates
+const UNSAFE_FILENAME_CHARS = /[\\/\0-\x1f\x7f]/g;
+
 /** Remove unsafe characters from a filename candidate. */
 function sanitizeFilename(input: SanitizeFilenameInput): string | undefined {
-  const sanitized = input.value
-    ?.replace(/[\\/\0-\x1f\x7f]/g, "")
-    .replace(/^\.+/, "")
-    .trim();
+  const sanitized = input.value?.replace(UNSAFE_FILENAME_CHARS, "").replace(/^\.+/, "").trim();
   return sanitized ? sanitized : undefined;
 }
 
@@ -988,15 +994,14 @@ interface SameAttachmentInput {
 
 /** Whether two attachments refer to the same artifact. */
 function isSameAttachment(input: SameAttachmentInput): boolean {
-  return input.left.id === input.right.id
-    && input.left.url === input.right.url
-    && input.left.filename === input.right.filename;
+  return (
+    input.left.id === input.right.id &&
+    input.left.url === input.right.url &&
+    input.left.filename === input.right.filename
+  );
 }
 
-
 // --- attachments/download-filename.helpers.ts ---
-
-
 
 const MIME_EXTENSIONS: Record<string, string> = {
   "application/pdf": ".pdf",
@@ -1026,8 +1031,9 @@ interface ExtensionForAttachmentInput {
 
 /** Infer a file extension for an attachment. */
 function extensionForAttachment(input: ExtensionForAttachmentInput): string {
-  const mimeExtension = extensionForMime({ mime: input.mimeOverride })
-    ?? extensionForMime({ mime: input.attachment.mime });
+  const mimeExtension =
+    extensionForMime({ mime: input.mimeOverride }) ??
+    extensionForMime({ mime: input.attachment.mime });
   if (mimeExtension) return mimeExtension;
   if (input.attachment.kind === "image") return ".png";
   if (input.attachment.kind === "pdf") return ".pdf";
@@ -1063,14 +1069,16 @@ function filenameForAttachment(input: FilenameForAttachmentInput): string {
 
 function resolvePreferredFilename(input: FilenameForAttachmentInput): string | undefined {
   const preferred = sanitizeFilename({ value: input.attachment.filename });
-  if (preferred) return withMissingExtension({ filename: preferred, attachment: input.attachment, mimeOverride: input.mimeOverride });
+  if (preferred)
+    return withMissingExtension({
+      filename: preferred,
+      attachment: input.attachment,
+      mimeOverride: input.mimeOverride,
+    });
   return sanitizeFilename({ value: filenameFromUrl({ url: input.attachment.url }) });
 }
 
 // --- attachments/download-http.helpers.ts ---
-
-
-
 
 interface ResolveDownloadPathInput {
   outDir: string;
@@ -1081,9 +1089,12 @@ interface ResolveDownloadPathInput {
 
 /** Resolve a unique download path, disambiguating filename collisions. */
 async function resolveDownloadPath(input: ResolveDownloadPathInput): Promise<string> {
-  const filename = filenameForAttachment({ attachment: input.attachment, mimeOverride: input.mimeOverride });
+  const filename = filenameForAttachment({
+    attachment: input.attachment,
+    mimeOverride: input.mimeOverride,
+  });
   const filePath = outputPath({ outDir: input.outDir, filename });
-  if (await existingSize({ filePath }) === undefined) return filePath;
+  if ((await existingSize({ filePath })) === undefined) return filePath;
   return resolveCollidingDownloadPath({ input, filename, filePath });
 }
 
@@ -1092,10 +1103,13 @@ async function resolveCollidingDownloadPath(input: {
   filename: string;
   filePath: string;
 }): Promise<string> {
-  const owner = input.input.attachments.find((item) =>
-    filenameForAttachment({ attachment: item, mimeOverride: input.input.mimeOverride }) === input.filename,
+  const owner = input.input.attachments.find(
+    (item) =>
+      filenameForAttachment({ attachment: item, mimeOverride: input.input.mimeOverride }) ===
+      input.filename,
   );
-  if (!owner || isSameAttachment({ left: owner, right: input.input.attachment })) return input.filePath;
+  if (!owner || isSameAttachment({ left: owner, right: input.input.attachment }))
+    return input.filePath;
   return outputPath({
     outDir: input.input.outDir,
     filename: disambiguateFilename({ filename: input.filename, id: input.input.attachment.id }),
@@ -1136,7 +1150,8 @@ interface DownloadHttpInput {
 /** Download an https attachment through the browser request context. */
 async function downloadHttpAttachment(input: DownloadHttpInput): Promise<DownloadResult> {
   const response = await input.page.context().request.get(input.attachment.url);
-  if (!response.ok()) throwFailedHttpAttachment({ attachment: input.attachment, status: response.status() });
+  if (!response.ok())
+    throwFailedHttpAttachment({ attachment: input.attachment, status: response.status() });
   return await saveHttpAttachmentResponse({
     outDir: input.outDir,
     attachment: input.attachment,
@@ -1145,12 +1160,7 @@ async function downloadHttpAttachment(input: DownloadHttpInput): Promise<Downloa
   });
 }
 
-
 // --- attachments/download-http.save.ts ---
-
-
-
-
 
 /** Save an HTTP attachment response body when content changed. */
 async function saveHttpAttachmentResponse(input: {
@@ -1167,7 +1177,7 @@ async function saveHttpAttachmentResponse(input: {
     mimeOverride: headers["content-type"],
   });
   const contentLength = Number(headers["content-length"]);
-  if (Number.isSafeInteger(contentLength) && await existingSize({ filePath }) === contentLength) {
+  if (Number.isSafeInteger(contentLength) && (await existingSize({ filePath })) === contentLength) {
     return { path: filePath, bytes: contentLength };
   }
   return writeIfChanged({ filePath, bytes: await input.response.body() });
@@ -1185,9 +1195,7 @@ function throwFailedHttpAttachment(input: {
   );
 }
 
-
 // --- attachments/download-path.helpers.ts ---
-
 
 interface OutputDirectoryInput {
   /** Conversation id used for the default downloads folder. */
@@ -1215,7 +1223,11 @@ function outputPath(input: OutputPathInput): string {
   const filePath = path.resolve(resolvedOutDir, input.filename);
   const relativePath = path.relative(resolvedOutDir, filePath);
   if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-    throw new AttachmentDownloadError("", undefined, `Invalid attachment output path: ${input.filename}`);
+    throw new AttachmentDownloadError(
+      "",
+      undefined,
+      `Invalid attachment output path: ${input.filename}`,
+    );
   }
   return filePath;
 }
@@ -1239,10 +1251,7 @@ function disambiguateFilename(input: DisambiguateInput): string {
   return `${input.filename.slice(0, -extension.length)}-${input.id}${extension}`;
 }
 
-
 // --- attachments/download-write.helpers.ts ---
-
-
 
 interface ExistingSizeInput {
   /** Absolute file path to stat. */
@@ -1268,26 +1277,25 @@ interface WriteIfChangedInput {
 
 /** Write bytes only when the destination size changed. */
 async function writeIfChanged(input: WriteIfChangedInput): Promise<DownloadResult> {
-  if (await existingSize({ filePath: input.filePath }) === input.bytes.byteLength) {
+  if ((await existingSize({ filePath: input.filePath })) === input.bytes.byteLength) {
     return { path: input.filePath, bytes: input.bytes.byteLength };
   }
   await writeFile(input.filePath, input.bytes);
   return { path: input.filePath, bytes: input.bytes.byteLength };
 }
 
-
 // --- attachments/extract-messages.helpers.ts ---
-
-
-
-
 
 async function persistAllMessages(params: {
   messages: SerializedMessage[];
   opts: ExtractMessagesOptions;
 }): Promise<Array<{ role: string; content: string; attachments: Attachment[] }>> {
   const manifest = await loadManifest(params.opts.conversationId);
-  const state = { manifest, counters: countersFromManifest(manifest), now: new Date().toISOString() };
+  const state = {
+    manifest,
+    counters: countersFromManifest(manifest),
+    now: new Date().toISOString(),
+  };
   const captured = await mapCapturedMessages({ ...params, ...state });
   return saveCapturedMessages({ captured, manifest: state.manifest, counters: state.counters });
 }
@@ -1311,7 +1319,15 @@ async function mapCapturedMessages(params: {
 }) {
   const captured: Array<{ role: string; content: string; attachments: Attachment[] }> = [];
   for (const message of params.messages) {
-    captured.push(await captureMessage({ message, opts: params.opts, counters: params.counters, now: params.now, manifest: params.manifest }));
+    captured.push(
+      await captureMessage({
+        message,
+        opts: params.opts,
+        counters: params.counters,
+        now: params.now,
+        manifest: params.manifest,
+      }),
+    );
   }
   return captured;
 }
@@ -1345,14 +1361,20 @@ async function registerMessageAttachments(params: {
     existing: params.manifest.attachments,
   });
   params.manifest.attachments.push(...registered.newAttachments);
-  return { role: params.message.role, content: registered.text, attachments: registered.attachments };
+  return {
+    role: params.message.role,
+    content: registered.text,
+    attachments: registered.attachments,
+  };
 }
 
-function shouldRegisterAttachments(params: { message: SerializedMessage; opts: ExtractMessagesOptions }): boolean {
+function shouldRegisterAttachments(params: {
+  message: SerializedMessage;
+  opts: ExtractMessagesOptions;
+}): boolean {
   if (params.message.role === "assistant") return true;
   return params.message.role === "user" && params.opts.includeUserAttachments === true;
 }
-
 
 // --- attachments/extract-messages.ts ---
 
@@ -1361,7 +1383,9 @@ async function extractAssistantContent(
   page: Page,
   opts: { conversationId: string },
 ): Promise<{ text: string; attachments: Attachment[] }> {
-  const message = await page.evaluate<SerializedMessage | null>(LAST_ASSISTANT_MESSAGE_SNAPSHOT_SOURCE);
+  const message = await page.evaluate<SerializedMessage | null>(
+    LAST_ASSISTANT_MESSAGE_SNAPSHOT_SOURCE,
+  );
   if (!message) return { text: "", attachments: [] };
   return registerExtractedContent({
     conversationId: opts.conversationId,
@@ -1379,9 +1403,7 @@ async function extractAllMessages(
   return persistAllMessages({ messages, opts });
 }
 
-
 // --- attachments/manifest-counters.ts ---
-
 
 /** Supported attachment kinds tracked in manifests. */
 function attachmentKinds(): AttachmentKind[] {
@@ -1402,7 +1424,10 @@ function countersFromAttachments(attachments: Attachment[]): AttachmentCounters 
   for (const attachment of attachments) {
     const suffix = Number(attachment.id.split("-").at(-1));
     if (Number.isFinite(suffix)) {
-      counters[attachment.role][attachment.kind] = Math.max(counters[attachment.role][attachment.kind], suffix);
+      counters[attachment.role][attachment.kind] = Math.max(
+        counters[attachment.role][attachment.kind],
+        suffix,
+      );
     }
   }
   return counters;
@@ -1432,10 +1457,18 @@ function normalizeCounters(value: unknown): AttachmentCounters {
   return applyLegacyCounters({ counters, value });
 }
 
-function applyLegacyCounters(params: { counters: AttachmentCounters; value: Record<string, unknown> }): AttachmentCounters {
-  applyRoleCounters({ counters: params.counters, role: "assistant", source: params.value.assistant });
+function applyLegacyCounters(params: {
+  counters: AttachmentCounters;
+  value: Record<string, unknown>;
+}): AttachmentCounters {
+  applyRoleCounters({
+    counters: params.counters,
+    role: "assistant",
+    source: params.value.assistant,
+  });
   applyRoleCounters({ counters: params.counters, role: "user", source: params.value.user });
-  if (isKindCounters(params.value)) applyRoleCounters({ counters: params.counters, role: "assistant", source: params.value });
+  if (isKindCounters(params.value))
+    applyRoleCounters({ counters: params.counters, role: "assistant", source: params.value });
   return params.counters;
 }
 
@@ -1466,18 +1499,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isKindCounters(value: unknown): value is LegacyAttachmentCounters {
   const kinds = attachmentKinds();
-  return isRecord(value)
-    && kinds.some((kind) => value[kind] !== undefined)
-    && kinds.every((kind) => value[kind] === undefined || typeof value[kind] === "number");
+  return (
+    isRecord(value) &&
+    kinds.some((kind) => value[kind] !== undefined) &&
+    kinds.every((kind) => value[kind] === undefined || typeof value[kind] === "number")
+  );
 }
 
-
 // --- attachments/manifest-store.ts ---
-
-
-
-
-
 
 function manifestPath(conversationId: string): string {
   const downloadsRoot = path.resolve(process.cwd(), "downloads");
@@ -1492,7 +1521,10 @@ function normalizeAttachment(attachment: SerializedAttachment): Attachment {
   return { ...attachment, role: attachment.role ?? "assistant" };
 }
 
-function normalizeManifest(params: { conversationId: string; manifest: Partial<AttachmentManifest> }): AttachmentManifest {
+function normalizeManifest(params: {
+  conversationId: string;
+  manifest: Partial<AttachmentManifest>;
+}): AttachmentManifest {
   const attachments = Array.isArray(params.manifest.attachments)
     ? params.manifest.attachments.map(normalizeAttachment)
     : [];
@@ -1507,7 +1539,10 @@ function normalizeManifest(params: { conversationId: string; manifest: Partial<A
 async function loadManifest(conversationId: string): Promise<AttachmentManifest> {
   try {
     const raw = await readFile(manifestPath(conversationId), "utf8");
-    return normalizeManifest({ conversationId, manifest: JSON.parse(raw) as Partial<AttachmentManifest> });
+    return normalizeManifest({
+      conversationId,
+      manifest: JSON.parse(raw) as Partial<AttachmentManifest>,
+    });
   } catch (error) {
     if (isNodeError(error) && error.code === "ENOENT") {
       return { conversationId, attachments: [], counters: emptyCounters() };
@@ -1525,7 +1560,10 @@ async function saveManifest(manifest: AttachmentManifest): Promise<void> {
 }
 
 /** Append already registered attachments to a conversation manifest. */
-async function appendAttachments(conversationId: string, items: Attachment[]): Promise<AttachmentManifest> {
+async function appendAttachments(
+  conversationId: string,
+  items: Attachment[],
+): Promise<AttachmentManifest> {
   const manifest = await loadManifest(conversationId);
   manifest.attachments.push(...items);
   manifest.counters = countersFromManifest(manifest);
@@ -1537,7 +1575,6 @@ async function appendAttachments(conversationId: string, items: Attachment[]): P
 function countersFromManifest(manifest: AttachmentManifest): AttachmentCounters {
   return mergeCounters(countersFromAttachments(manifest.attachments), manifest.counters);
 }
-
 
 // --- attachments/snapshot-mime.ts ---
 
@@ -1555,7 +1592,9 @@ function inferMimeFromDataUrl(url: string): string | undefined {
   return dataMatch?.[1];
 }
 
-function inferMimeFromExtension(params: { url: string; fallback: AttachmentKind }): string | undefined {
+function inferMimeFromExtension(params: { url: string; fallback: AttachmentKind }):
+  | string
+  | undefined {
   const lower = params.url.split("?")[0]?.toLowerCase() ?? "";
   const mapped = extensionMime(lower);
   if (mapped) return mapped;
@@ -1573,12 +1612,11 @@ function inferMime(params: { url: string; fallback: AttachmentKind }): string | 
   return inferMimeFromDataUrl(params.url) ?? inferMimeFromExtension(params);
 }
 
-
-
 // --- attachments/snapshot-walk.helpers.ts ---
 
-
-function readAttr(params: { node: Extract<DomSnapshotNode, { type: "element" }>; name: string }): string | undefined {
+function readAttr(params: { node: Extract<DomSnapshotNode, { type: "element" }>; name: string }):
+  | string
+  | undefined {
   return params.node.attributes[params.name];
 }
 
@@ -1595,14 +1633,20 @@ function textOnly(node: DomSnapshotNode): string {
 function isFileLink(node: Extract<DomSnapshotNode, { type: "element" }>): boolean {
   if (readAttr({ node, name: "download" }) !== undefined) return true;
   const href = readAttr({ node, name: "href" }) ?? "";
-  const label = `${readAttr({ node, name: "aria-label" }) ?? ""} ${readAttr({ node, name: "data-testid" }) ?? ""}`.toLowerCase();
+  const label =
+    `${readAttr({ node, name: "aria-label" }) ?? ""} ${readAttr({ node, name: "data-testid" }) ?? ""}`.toLowerCase();
   return href.startsWith("blob:") || label.includes("download") || label.includes("file");
 }
 
 function attachmentFromImage(node: Extract<DomSnapshotNode, { type: "element" }>) {
   const url = readAttr({ node, name: "currentSrc" }) || readAttr({ node, name: "src" });
   if (!url) return null;
-  return { kind: "image" as const, url, filename: optionalText(readAttr({ node, name: "alt" })), mime: inferMime({ url, fallback: "image" }) };
+  return {
+    kind: "image" as const,
+    url,
+    filename: optionalText(readAttr({ node, name: "alt" })),
+    mime: inferMime({ url, fallback: "image" }),
+  };
 }
 
 function attachmentFromIframe(node: Extract<DomSnapshotNode, { type: "element" }>) {
@@ -1611,7 +1655,9 @@ function attachmentFromIframe(node: Extract<DomSnapshotNode, { type: "element" }
   return {
     kind: "pdf" as const,
     url,
-    filename: optionalText(readAttr({ node, name: "title" }) || readAttr({ node, name: "aria-label" })),
+    filename: optionalText(
+      readAttr({ node, name: "title" }) || readAttr({ node, name: "aria-label" }),
+    ),
     mime: "application/pdf",
   };
 }
@@ -1634,11 +1680,7 @@ function attachmentFromElement(node: Extract<DomSnapshotNode, { type: "element" 
   return null;
 }
 
-
-
 // --- attachments/snapshot-walk.ts ---
-
-
 
 /** Convert a DOM snapshot into text with temporary attachment markers. */
 function extractContentFromSnapshot(root: DomSnapshotNode): ExtractedContent {
@@ -1647,7 +1689,10 @@ function extractContentFromSnapshot(root: DomSnapshotNode): ExtractedContent {
   return { text, attachments };
 }
 
-function walkSnapshot(params: { node: DomSnapshotNode; attachments: AttachmentCandidate[] }): string {
+function walkSnapshot(params: {
+  node: DomSnapshotNode;
+  attachments: AttachmentCandidate[];
+}): string {
   if (params.node.type === "text") {
     return typeof params.node.text === "string" ? params.node.text : "";
   }
@@ -1657,7 +1702,9 @@ function walkSnapshot(params: { node: DomSnapshotNode; attachments: AttachmentCa
     return markerFor(params.attachments.length - 1);
   }
   if (params.node.tagName === "br") return "\n";
-  return params.node.children.map((child) => walkSnapshot({ node: child, attachments: params.attachments })).join("");
+  return params.node.children
+    .map((child) => walkSnapshot({ node: child, attachments: params.attachments }))
+    .join("");
 }
 
 // --- connector.constants.ts ---
@@ -1666,7 +1713,6 @@ const DEFAULT_CONNECTOR_NAME = "ai-browser-bridge";
 
 /** Prefix identifying bridge-owned connector apps in ChatGPT settings. */
 const BRIDGE_CONNECTOR_PREFIX = "ai-browser-bridge";
-
 
 // --- connector/accept-custom-mcp-risk.ts ---
 
@@ -1678,23 +1724,25 @@ interface IsRiskCheckboxVisibleContext {
 
 /** True when the custom MCP risk checkbox is visible in the form. */
 async function isRiskCheckboxVisible(ctx: IsRiskCheckboxVisibleContext): Promise<boolean> {
-  const checkbox = ctx.setup.page.locator('input[data-testid="trust-checkbox"], input[type="checkbox"]').first();
-  if (await checkbox.count() === 0) return false;
+  const checkbox = ctx.setup.page
+    .locator('input[data-testid="trust-checkbox"], input[type="checkbox"]')
+    .first();
+  if ((await checkbox.count()) === 0) return false;
   return checkbox.isVisible().catch(() => false);
 }
 
 /** Accept the custom MCP risk checkbox when ChatGPT shows it in the form. */
 async function acceptCustomMcpRiskIfPresent(ctx: ConnectorSetupContext): Promise<boolean> {
-  if (!await isRiskCheckboxVisible({ setup: ctx })) return false;
-  const checkbox = ctx.page.locator('input[data-testid="trust-checkbox"], input[type="checkbox"]').first();
+  if (!(await isRiskCheckboxVisible({ setup: ctx }))) return false;
+  const checkbox = ctx.page
+    .locator('input[data-testid="trust-checkbox"], input[type="checkbox"]')
+    .first();
   if (await checkbox.isChecked().catch(() => false)) return true;
   await checkbox.check({ force: true });
   return true;
 }
 
-
 // --- connector/append-unique-summary.ts ---
-
 
 /** Context for {@link appendUniqueSummary}. */
 interface AppendUniqueSummaryContext {
@@ -1714,7 +1762,6 @@ function appendUniqueSummary(ctx: AppendUniqueSummaryContext): void {
   ctx.seen.add(key);
   ctx.summaries.push(ctx.summary);
 }
-
 
 // --- connector/chatgpt-return-url.ts ---
 /** Context for {@link chatGptReturnUrl}. */
@@ -1737,12 +1784,7 @@ function chatGptReturnUrl(ctx: ChatGptReturnUrlContext): string | null {
   }
 }
 
-
 // --- connector/cleanup-duplicate-connector-apps.ts ---
-
-
-
-
 
 /** Context for {@link findDeleteTargets}. */
 interface FindDeleteTargetsContext {
@@ -1756,7 +1798,10 @@ interface FindDeleteTargetsContext {
 
 /** Select connector summaries that should be deleted as duplicates or stale entries. */
 function findDeleteTargets(ctx: FindDeleteTargetsContext): ConnectorAppSummary[] {
-  const current = ctx.summaries.find((summary) => summary.name === ctx.connectorName && summary.url === ctx.connectorUrl) ?? null;
+  const current =
+    ctx.summaries.find(
+      (summary) => summary.name === ctx.connectorName && summary.url === ctx.connectorUrl,
+    ) ?? null;
   return ctx.summaries.filter((summary) => {
     if (summary.name !== ctx.connectorName) return true;
     if (summary.url !== ctx.connectorUrl) return true;
@@ -1767,15 +1812,23 @@ function findDeleteTargets(ctx: FindDeleteTargetsContext): ConnectorAppSummary[]
 /** Remove duplicate bridge connector apps and return whether the desired connector exists. */
 async function cleanupDuplicateConnectorApps(ctx: ConnectorSetupContext): Promise<boolean> {
   const summaries = await listBridgeConnectorSummaries({ page: ctx.page });
-  const current = summaries.find((summary) => summary.name === ctx.connectorName && summary.url === ctx.connectorUrl) ?? null;
-  await deleteDuplicateTargets({ setup: ctx, deleteTargets: findDeleteTargets({ summaries, connectorName: ctx.connectorName, connectorUrl: ctx.connectorUrl }) });
+  const current =
+    summaries.find(
+      (summary) => summary.name === ctx.connectorName && summary.url === ctx.connectorUrl,
+    ) ?? null;
+  await deleteDuplicateTargets({
+    setup: ctx,
+    deleteTargets: findDeleteTargets({
+      summaries,
+      connectorName: ctx.connectorName,
+      connectorUrl: ctx.connectorUrl,
+    }),
+  });
   await openConnectorList({ page: ctx.page });
   return !!current;
 }
 
-
 // --- connector/click-connector-details-button.ts ---
-
 
 /** Context for {@link clickConnectorDetailsButton}. */
 interface ClickConnectorDetailsButtonContext {
@@ -1791,7 +1844,6 @@ async function clickConnectorDetailsButton(ctx: ClickConnectorDetailsButtonConte
   await ctx.setup.page.waitForTimeout(1_000);
   ctx.setup.result.steps.push(`Opened existing connector: ${ctx.setup.connectorName}.`);
 }
-
 
 // --- connector/click-connector-entry-button.ts ---
 
@@ -1809,22 +1861,15 @@ async function clickConnectorEntryButton(ctx: ClickConnectorEntryButtonContext):
   await ctx.page.waitForTimeout(1_000);
 }
 
-
 // --- connector/click-connector-from-more-menu.ts ---
-
-
 
 /** Click the connector entry from the composer More submenu when needed. */
 async function clickConnectorFromMoreMenu(ctx: ConnectorSetupContext): Promise<boolean> {
-  if (!await hoverAndClickMoreMenuItem({ setup: ctx })) return false;
+  if (!(await hoverAndClickMoreMenuItem({ setup: ctx }))) return false;
   return clickConnectorMenuItem({ page: ctx.page, connectorName: ctx.connectorName });
 }
 
-
 // --- connector/click-connector-list-entry.ts ---
-
-
-
 
 /** Context for {@link clickConnectorListEntry}. */
 interface ClickConnectorListEntryContext {
@@ -1843,7 +1888,6 @@ async function clickConnectorListEntry(ctx: ClickConnectorListEntryContext): Pro
   return true;
 }
 
-
 // --- connector/click-connector-menu-item.ts ---
 
 /** Context for {@link clickConnectorMenuItem}. */
@@ -1856,16 +1900,18 @@ interface ClickConnectorMenuItemContext {
 
 /** Click a connector entry in the composer plus-menu. */
 async function clickConnectorMenuItem(ctx: ClickConnectorMenuItemContext): Promise<boolean> {
-  const item = ctx.page.locator(`[role="menu"] [role="menuitem"]:has-text("${ctx.connectorName}"), [role="menu"] button:has-text("${ctx.connectorName}"), [role="menu"] :text-is("${ctx.connectorName}")`).last();
-  if (!await item.isVisible().catch(() => false)) return false;
+  const item = ctx.page
+    .locator(
+      `[role="menu"] [role="menuitem"]:has-text("${ctx.connectorName}"), [role="menu"] button:has-text("${ctx.connectorName}"), [role="menu"] :text-is("${ctx.connectorName}")`,
+    )
+    .last();
+  if (!(await item.isVisible().catch(() => false))) return false;
   await item.click({ timeout: 3_000, force: true });
   await ctx.page.waitForTimeout(500);
   return true;
 }
 
-
 // --- connector/click-delete-confirmation.ts ---
-
 
 /** Context for {@link clickDeleteConfirmation}. */
 interface ClickDeleteConfirmationContext {
@@ -1888,9 +1934,7 @@ async function clickDeleteConfirmation(ctx: ClickDeleteConfirmationContext): Pro
   await ctx.page.waitForTimeout(2_000);
 }
 
-
 // --- connector/click-delete-menu-item.ts ---
-
 
 /** Context for {@link clickDeleteMenuItem}. */
 interface ClickDeleteMenuItemContext {
@@ -1909,9 +1953,7 @@ async function clickDeleteMenuItem(ctx: ClickDeleteMenuItemContext) {
   });
 }
 
-
 // --- connector/click-more-menu-item.ts ---
-
 
 /** Context for {@link clickMoreMenuItem}. */
 interface ClickMoreMenuItemContext {
@@ -1928,10 +1970,7 @@ async function clickMoreMenuItem(ctx: ClickMoreMenuItemContext): Promise<void> {
   await ctx.setup.page.waitForTimeout(750);
 }
 
-
 // --- connector/click-settings-entry.ts ---
-
-
 
 /** Context for {@link clickSettingsEntry}. */
 interface ClickSettingsEntryContext {
@@ -1954,9 +1993,7 @@ async function clickSettingsEntry(ctx: ClickSettingsEntryContext): Promise<void>
   }
 }
 
-
 // --- connector/close-settings-dialog.ts ---
-
 
 /** Close the settings dialog when a close button is visible. */
 async function closeSettingsDialogIfPresent(ctx: ConnectorSetupContext): Promise<void> {
@@ -1973,10 +2010,7 @@ async function closeSettingsDialogIfPresent(ctx: ConnectorSetupContext): Promise
   }
 }
 
-
 // --- connector/confirm-open-connector-deletion.ts ---
-
-
 
 /** Context for {@link clickDeleteMenuEntry}. */
 interface ClickDeleteMenuEntryContext {
@@ -2000,16 +2034,16 @@ interface ConfirmOpenConnectorDeletionContext {
 }
 
 /** Confirm deletion for the currently open connector detail panel. */
-async function confirmOpenConnectorDeletion(ctx: ConfirmOpenConnectorDeletionContext): Promise<boolean> {
+async function confirmOpenConnectorDeletion(
+  ctx: ConfirmOpenConnectorDeletionContext,
+): Promise<boolean> {
   const deleteItem = await clickDeleteMenuItem({ page: ctx.page });
   if (!deleteItem) return false;
   await clickDeleteMenuEntry({ deleteItem, page: ctx.page });
   return true;
 }
 
-
 // --- connector/connector-composer-helpers.ts ---
-
 
 /** Context for {@link findSelectedConnectorPill}. */
 interface FindSelectedConnectorPillContext {
@@ -2020,7 +2054,9 @@ interface FindSelectedConnectorPillContext {
 }
 
 /** Find the selected connector pill in the composer by aria-label. */
-async function findSelectedConnectorPill(ctx: FindSelectedConnectorPillContext): Promise<Locator | null> {
+async function findSelectedConnectorPill(
+  ctx: FindSelectedConnectorPillContext,
+): Promise<Locator | null> {
   const buttons = await ctx.page.locator('button[aria-label*="click to remove"]').all();
   for (const button of buttons) {
     const aria = await button.getAttribute("aria-label").catch(() => null);
@@ -2036,13 +2072,20 @@ interface IsConnectorSelectedInComposerContext {
 }
 
 /** True when the desired connector pill is already selected in the composer. */
-async function isConnectorSelectedInComposer(ctx: IsConnectorSelectedInComposerContext): Promise<boolean> {
-  return !!await findSelectedConnectorPill({ page: ctx.setup.page, connectorName: ctx.setup.connectorName });
+async function isConnectorSelectedInComposer(
+  ctx: IsConnectorSelectedInComposerContext,
+): Promise<boolean> {
+  return !!(await findSelectedConnectorPill({
+    page: ctx.setup.page,
+    connectorName: ctx.setup.connectorName,
+  }));
 }
 
 /** Remove stale bridge connector pills that are not the desired connector. */
 async function removeStaleBridgeConnectorPills(ctx: ConnectorSetupContext): Promise<void> {
-  const buttons = await ctx.page.locator('button[aria-label*="ai-browser-bridge"][aria-label*="click to remove"]').all();
+  const buttons = await ctx.page
+    .locator('button[aria-label*="ai-browser-bridge"][aria-label*="click to remove"]')
+    .all();
   for (const button of buttons) {
     const aria = await button.getAttribute("aria-label").catch(() => null);
     if (!aria || aria === `${ctx.connectorName}, click to remove`) continue;
@@ -2050,7 +2093,6 @@ async function removeStaleBridgeConnectorPills(ctx: ConnectorSetupContext): Prom
     await ctx.page.waitForTimeout(250);
   }
 }
-
 
 // --- connector/connector-summary-helpers.ts ---
 
@@ -2062,9 +2104,7 @@ interface NormalizeConnectorListLabelContext {
 
 /** Normalize connector list button labels for comparison. */
 function normalizeConnectorListLabel(ctx: NormalizeConnectorListLabelContext): string {
-  return normalizeDisplayText({ value: ctx.value })
-    .replace(/\s+/g, "")
-    .replace(/DEV$/i, "");
+  return normalizeDisplayText({ value: ctx.value }).replace(/\s+/g, "").replace(/DEV$/i, "");
 }
 
 /** Context for {@link valueAfterLine}. */
@@ -2107,9 +2147,7 @@ function sameConnectorApp(ctx: SameConnectorAppContext): boolean {
   return ctx.a.name === ctx.b.name && ctx.a.url === ctx.b.url;
 }
 
-
 // --- connector/connector.types.ts ---
-
 
 /** Mutable context passed through connector setup steps. */
 interface ConnectorSetupContext {
@@ -2140,14 +2178,7 @@ interface ConnectorAppSummary {
   url: string | null;
 }
 
-
 // --- connector/create-new-connector.ts ---
-
-
-
-
-
-
 
 /** Context for {@link warnMissingConnectorUrlField}. */
 interface WarnMissingConnectorUrlFieldContext {
@@ -2156,8 +2187,12 @@ interface WarnMissingConnectorUrlFieldContext {
 }
 
 /** Record a warning and optionally restore the page when the URL field is missing. */
-async function warnMissingConnectorUrlField(ctx: WarnMissingConnectorUrlFieldContext): Promise<void> {
-  ctx.setup.result.warnings.push("Could not find the connector URL field. The settings UI is open; paste the Connector URL manually.");
+async function warnMissingConnectorUrlField(
+  ctx: WarnMissingConnectorUrlFieldContext,
+): Promise<void> {
+  ctx.setup.result.warnings.push(
+    "Could not find the connector URL field. The settings UI is open; paste the Connector URL manually.",
+  );
   if (ctx.setup.options.automatic) await restoreAfterConnectorSetup(ctx.setup);
 }
 
@@ -2166,20 +2201,14 @@ async function createNewConnector(ctx: ConnectorSetupContext): Promise<void> {
   await openAdvancedSettingsIfPresent(ctx);
   await enableDeveloperModeIfPresent(ctx);
   await openCreateConnectorForm(ctx);
-  if (!await fillConnectorFormFields(ctx)) {
+  if (!(await fillConnectorFormFields(ctx))) {
     await warnMissingConnectorUrlField({ setup: ctx });
     return;
   }
   await finishConnectorCreation({ setup: ctx });
 }
 
-
 // --- connector/delete-connector-app-by-summary.ts ---
-
-
-
-
-
 
 /** Context for {@link deleteConnectorAppBySummary}. */
 interface DeleteConnectorAppBySummaryContext {
@@ -2190,7 +2219,9 @@ interface DeleteConnectorAppBySummaryContext {
 }
 
 /** Delete one connector app by locating and opening its summary panel. */
-async function deleteConnectorAppBySummary(ctx: DeleteConnectorAppBySummaryContext): Promise<boolean> {
+async function deleteConnectorAppBySummary(
+  ctx: DeleteConnectorAppBySummaryContext,
+): Promise<boolean> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await openConnectorList({ page: ctx.page });
     const entries = await findBridgeConnectorButtons({ page: ctx.page });
@@ -2206,9 +2237,7 @@ async function deleteConnectorAppBySummary(ctx: DeleteConnectorAppBySummaryConte
   return false;
 }
 
-
 // --- connector/delete-duplicate-targets.ts ---
-
 
 /** Context for {@link deleteDuplicateTargets}. */
 interface DeleteDuplicateTargetsContext {
@@ -2223,17 +2252,16 @@ async function deleteDuplicateTargets(ctx: DeleteDuplicateTargetsContext): Promi
   for (const target of ctx.deleteTargets) {
     const deleted = await deleteConnectorAppBySummary({ page: ctx.setup.page, target });
     if (deleted) {
-      ctx.setup.result.steps.push(`Deleted duplicate connector app: ${target.name}${target.url ? ` (${target.url})` : ""}.`);
+      ctx.setup.result.steps.push(
+        `Deleted duplicate connector app: ${target.name}${target.url ? ` (${target.url})` : ""}.`,
+      );
     } else {
       ctx.setup.result.warnings.push(`Could not delete duplicate connector app: ${target.name}.`);
     }
   }
 }
 
-
 // --- connector/delete-open-connector.ts ---
-
-
 
 /** Context for {@link deleteOpenConnectorIfPresent}. */
 interface DeleteOpenConnectorIfPresentContext {
@@ -2242,7 +2270,9 @@ interface DeleteOpenConnectorIfPresentContext {
 }
 
 /** Delete the currently open connector via Manage -> Delete when available. */
-async function deleteOpenConnectorIfPresent(ctx: DeleteOpenConnectorIfPresentContext): Promise<boolean> {
+async function deleteOpenConnectorIfPresent(
+  ctx: DeleteOpenConnectorIfPresentContext,
+): Promise<boolean> {
   const manage = await firstVisible({
     page: ctx.page,
     selectors: ['[role="dialog"] button:has-text("Manage")'],
@@ -2252,7 +2282,6 @@ async function deleteOpenConnectorIfPresent(ctx: DeleteOpenConnectorIfPresentCon
   await ctx.page.waitForTimeout(500);
   return confirmOpenConnectorDeletion({ page: ctx.page });
 }
-
 
 // --- connector/enable-developer-mode.dom-snippet.ts ---
 /** In-page script that toggles Developer mode when present in settings. */
@@ -2282,9 +2311,7 @@ const ENABLE_DEVELOPER_MODE_SNIPPET = `() => {
   return "not-found";
 }`;
 
-
 // --- connector/enable-developer-mode.ts ---
-
 
 /** Enable Developer mode via in-page toggle discovery when available. */
 async function enableDeveloperModeIfPresent(ctx: ConnectorSetupContext): Promise<void> {
@@ -2298,12 +2325,12 @@ async function enableDeveloperModeIfPresent(ctx: ConnectorSetupContext): Promise
     ctx.result.steps.push("Developer mode was already enabled.");
     return;
   }
-  ctx.result.warnings.push("Could not find the Developer mode toggle. It may already be enabled or unavailable for this account/workspace.");
+  ctx.result.warnings.push(
+    "Could not find the Developer mode toggle. It may already be enabled or unavailable for this account/workspace.",
+  );
 }
 
-
 // --- connector/ensure-composer-connector-selected.ts ---
-
 
 /** Ensure the desired connector is selected in the composer, opening the menu if needed. */
 async function ensureComposerConnectorSelected(ctx: ConnectorSetupContext): Promise<boolean> {
@@ -2313,14 +2340,7 @@ async function ensureComposerConnectorSelected(ctx: ConnectorSetupContext): Prom
   return openComposerConnectorMenu(ctx);
 }
 
-
 // --- connector/execute-connector-setup.ts ---
-
-
-
-
-
-
 
 /** Context for {@link runConnectorSetupSteps}. */
 interface RunConnectorSetupStepsContext {
@@ -2331,26 +2351,33 @@ interface RunConnectorSetupStepsContext {
 }
 
 /** Run post-settings connector setup steps after the settings panels are open. */
-async function runConnectorSetupSteps(ctx: RunConnectorSetupStepsContext): Promise<ConnectorSetupContext["result"]> {
-  if (await tryFinalizeExistingConnector({ setup: ctx.setup, hasCurrentConnector: ctx.hasCurrentConnector })) {
+async function runConnectorSetupSteps(
+  ctx: RunConnectorSetupStepsContext,
+): Promise<ConnectorSetupContext["result"]> {
+  if (
+    await tryFinalizeExistingConnector({
+      setup: ctx.setup,
+      hasCurrentConnector: ctx.hasCurrentConnector,
+    })
+  ) {
     return ctx.setup.result;
   }
-  if (!await handleStaleExistingConnector(ctx.setup)) return ctx.setup.result;
+  if (!(await handleStaleExistingConnector(ctx.setup))) return ctx.setup.result;
   await createNewConnector(ctx.setup);
   return ctx.setup.result;
 }
 
 /** Run the full ChatGPT connector setup workflow. */
-async function executeConnectorSetup(ctx: ConnectorSetupContext): Promise<ConnectorSetupContext["result"]> {
+async function executeConnectorSetup(
+  ctx: ConnectorSetupContext,
+): Promise<ConnectorSetupContext["result"]> {
   await openChatGptSettings(ctx);
   await openAppsOrConnectorsPanel(ctx);
   const hasCurrentConnector = await cleanupDuplicateConnectorApps(ctx);
   return runConnectorSetupSteps({ setup: ctx, hasCurrentConnector });
 }
 
-
 // --- connector/fill-connector-form-fields.ts ---
-
 
 /** Context for {@link fillConnectorUrlField}. */
 interface FillConnectorUrlFieldContext {
@@ -2364,7 +2391,7 @@ async function fillConnectorUrlField(ctx: FillConnectorUrlFieldContext): Promise
     page: ctx.setup.page,
     selectors: [
       'input[name="custom-connector-url"]',
-      '#custom-connector-url',
+      "#custom-connector-url",
       'input[type="url"]',
       'input[name*="url" i]',
       'input[placeholder*="https://" i]',
@@ -2390,7 +2417,7 @@ async function fillConnectorNameField(ctx: FillConnectorNameFieldContext): Promi
     page: ctx.setup.page,
     selectors: [
       'input[name="custom-connector-name"]',
-      '#custom-connector-name',
+      "#custom-connector-name",
       'input[name*="name" i]',
       'input[placeholder*="name" i]',
       'input[aria-label*="name" i]',
@@ -2402,15 +2429,12 @@ async function fillConnectorNameField(ctx: FillConnectorNameFieldContext): Promi
 
 /** Fill connector URL and name fields in the creation form. */
 async function fillConnectorFormFields(ctx: ConnectorSetupContext): Promise<boolean> {
-  if (!await fillConnectorUrlField({ setup: ctx })) return false;
+  if (!(await fillConnectorUrlField({ setup: ctx }))) return false;
   await fillConnectorNameField({ setup: ctx });
   return true;
 }
 
-
 // --- connector/finalize-current-connector.ts ---
-
-
 
 /** Finalize setup when an existing connector already uses the current URL. */
 async function finalizeCurrentConnector(ctx: ConnectorSetupContext): Promise<void> {
@@ -2422,11 +2446,7 @@ async function finalizeCurrentConnector(ctx: ConnectorSetupContext): Promise<voi
   await selectConnectorAfterSetup(ctx);
 }
 
-
 // --- connector/find-bridge-connector-buttons.ts ---
-
-
-
 
 /** Context for {@link findBridgeConnectorButtons}. */
 interface FindBridgeConnectorButtonsContext {
@@ -2435,7 +2455,9 @@ interface FindBridgeConnectorButtonsContext {
 }
 
 /** Find bridge connector buttons in the open settings dialog. */
-async function findBridgeConnectorButtons(ctx: FindBridgeConnectorButtonsContext): Promise<Array<{ button: Locator; name: string }>> {
+async function findBridgeConnectorButtons(
+  ctx: FindBridgeConnectorButtonsContext,
+): Promise<Array<{ button: Locator; name: string }>> {
   const buttons = await ctx.page.locator('[role="dialog"] button').all();
   const entries: Array<{ button: Locator; name: string }> = [];
   for (const button of buttons) {
@@ -2447,10 +2469,7 @@ async function findBridgeConnectorButtons(ctx: FindBridgeConnectorButtonsContext
   return entries;
 }
 
-
 // --- connector/find-connector-button.ts ---
-
-
 
 /** Context for {@link findConnectorButton}. */
 interface FindConnectorButtonContext {
@@ -2485,18 +2504,13 @@ async function waitForConnectorButton(ctx: WaitForConnectorButtonContext): Promi
   const startedAt = Date.now();
   while (Date.now() - startedAt < ctx.timeoutMs) {
     const button = await findConnectorButton({ page: ctx.page, connectorName: ctx.connectorName });
-    if (button && await button.isVisible().catch(() => false)) return true;
+    if (button && (await button.isVisible().catch(() => false))) return true;
     await ctx.page.waitForTimeout(500);
   }
   return false;
 }
 
-
 // --- connector/finish-connector-creation.ts ---
-
-
-
-
 
 /** Context for {@link recordConnectorFormOptions}. */
 interface RecordConnectorFormOptionsContext {
@@ -2529,21 +2543,16 @@ async function finishConnectorCreation(ctx: FinishConnectorCreationContext): Pro
   }
 }
 
-
 // --- connector/handle-stale-existing-connector.ts ---
-
-
-
-
-
-
 
 /** Handle stale or unknown existing connectors before creating a new one. */
 async function handleStaleExistingConnector(ctx: ConnectorSetupContext): Promise<boolean> {
   const existing = await openExistingConnectorDetails(ctx);
   if (existing === "stale") return deleteStaleConnector(ctx);
   if (existing === "unknown") {
-    ctx.result.warnings.push("Existing connector was found, but its URL could not be read from the settings panel.");
+    ctx.result.warnings.push(
+      "Existing connector was found, but its URL could not be read from the settings panel.",
+    );
   }
   return true;
 }
@@ -2551,21 +2560,22 @@ async function handleStaleExistingConnector(ctx: ConnectorSetupContext): Promise
 /** Delete a stale connector and reopen the connectors panel for recreation. */
 async function deleteStaleConnector(ctx: ConnectorSetupContext): Promise<boolean> {
   if (await deleteOpenConnectorIfPresent({ page: ctx.page })) {
-    ctx.result.steps.push("Deleted stale connector app before recreating it with the new tunnel URL.");
+    ctx.result.steps.push(
+      "Deleted stale connector app before recreating it with the new tunnel URL.",
+    );
     await returnToConnectorListIfNeeded(ctx);
     await openAppsOrConnectorsPanel(ctx);
     await openAdvancedSettingsIfPresent(ctx);
     return true;
   }
-  ctx.result.warnings.push("Existing connector uses an old tunnel URL, but ChatGPT did not expose a delete/update control.");
+  ctx.result.warnings.push(
+    "Existing connector uses an old tunnel URL, but ChatGPT did not expose a delete/update control.",
+  );
   if (ctx.options.automatic) await restoreAfterConnectorSetup(ctx);
   return false;
 }
 
-
 // --- connector/hover-and-click-more-menu-item.ts ---
-
-
 
 /** Context for {@link hoverAndClickMoreMenuItem}. */
 interface HoverAndClickMoreMenuItemContext {
@@ -2587,12 +2597,7 @@ async function hoverAndClickMoreMenuItem(ctx: HoverAndClickMoreMenuItemContext):
   return true;
 }
 
-
 // --- connector/init-connector-setup-context.ts ---
-
-
-
-
 
 /** Input for initializing a connector setup context. */
 interface InitConnectorSetupContextInput {
@@ -2623,13 +2628,7 @@ function initConnectorSetupContext(input: InitConnectorSetupContextInput): Conne
   };
 }
 
-
 // --- connector/list-bridge-connector-summaries.ts ---
-
-
-
-
-
 
 /** Context for {@link collectConnectorSummaries}. */
 interface CollectConnectorSummariesContext {
@@ -2640,7 +2639,9 @@ interface CollectConnectorSummariesContext {
 }
 
 /** Collect unique connector summaries by opening each listed connector. */
-async function collectConnectorSummaries(ctx: CollectConnectorSummariesContext): Promise<ConnectorAppSummary[]> {
+async function collectConnectorSummaries(
+  ctx: CollectConnectorSummariesContext,
+): Promise<ConnectorAppSummary[]> {
   const summaries: ConnectorAppSummary[] = [];
   const seen = new Set<string>();
   for (let index = 0; index < ctx.entryCount; index += 1) {
@@ -2660,7 +2661,9 @@ interface ListBridgeConnectorSummariesContext {
 }
 
 /** Enumerate all bridge connector apps listed in ChatGPT settings. */
-async function listBridgeConnectorSummaries(ctx: ListBridgeConnectorSummariesContext): Promise<ConnectorAppSummary[]> {
+async function listBridgeConnectorSummaries(
+  ctx: ListBridgeConnectorSummariesContext,
+): Promise<ConnectorAppSummary[]> {
   await openConnectorList({ page: ctx.page });
   const entryCount = (await findBridgeConnectorButtons({ page: ctx.page })).length;
   const summaries = await collectConnectorSummaries({ page: ctx.page, entryCount });
@@ -2668,9 +2671,7 @@ async function listBridgeConnectorSummaries(ctx: ListBridgeConnectorSummariesCon
   return summaries;
 }
 
-
 // --- connector/open-advanced-settings.ts ---
-
 
 /** Open Advanced settings when the control is visible in the connectors panel. */
 async function openAdvancedSettingsIfPresent(ctx: ConnectorSetupContext): Promise<void> {
@@ -2688,9 +2689,7 @@ async function openAdvancedSettingsIfPresent(ctx: ConnectorSetupContext): Promis
   if (opened) ctx.result.steps.push("Opened Advanced settings.");
 }
 
-
 // --- connector/open-apps-or-connectors-panel.ts ---
-
 
 /** Open the Apps or Connectors panel inside ChatGPT settings. */
 async function openAppsOrConnectorsPanel(ctx: ConnectorSetupContext): Promise<void> {
@@ -2709,19 +2708,23 @@ async function openAppsOrConnectorsPanel(ctx: ConnectorSetupContext): Promise<vo
   if (opened) {
     ctx.result.steps.push("Opened Apps/Connectors settings.");
   } else {
-    ctx.result.warnings.push("Could not find Apps/Connectors in settings. Use Settings -> Apps manually.");
+    ctx.result.warnings.push(
+      "Could not find Apps/Connectors in settings. Use Settings -> Apps manually.",
+    );
   }
 }
 
-
 // --- connector/open-chatgpt-settings.ts ---
-
 
 /** Open ChatGPT settings, preferring the Connectors deep link. */
 async function openChatGptSettings(ctx: ConnectorSetupContext): Promise<void> {
-  await ctx.page.goto("https://chatgpt.com/#settings/Connectors", { waitUntil: "domcontentloaded" }).catch(() => {});
+  await ctx.page
+    .goto("https://chatgpt.com/#settings/Connectors", { waitUntil: "domcontentloaded" })
+    .catch(() => {});
   await ctx.page.waitForTimeout(1_500);
-  const settingsDialogOpen = await ctx.page.locator('[role="dialog"]:has-text("Apps"), [role="dialog"]:has-text("Connectors")').first()
+  const settingsDialogOpen = await ctx.page
+    .locator('[role="dialog"]:has-text("Apps"), [role="dialog"]:has-text("Connectors")')
+    .first()
     .isVisible()
     .catch(() => false);
   if (settingsDialogOpen) {
@@ -2731,11 +2734,7 @@ async function openChatGptSettings(ctx: ConnectorSetupContext): Promise<void> {
   await openSettingsFromAccountMenu(ctx);
 }
 
-
 // --- connector/open-composer-connector-menu.ts ---
-
-
-
 
 /** Context for {@link openComposerPlusMenu}. */
 interface OpenComposerPlusMenuContext {
@@ -2761,15 +2760,13 @@ async function openComposerPlusMenu(ctx: OpenComposerPlusMenuContext): Promise<b
 
 /** Open the composer plus-menu and choose the connector, including More submenu. */
 async function openComposerConnectorMenu(ctx: ConnectorSetupContext): Promise<boolean> {
-  if (!await openComposerPlusMenu({ setup: ctx })) return false;
-  if (await clickConnectorMenuItem({ page: ctx.page, connectorName: ctx.connectorName })) return true;
+  if (!(await openComposerPlusMenu({ setup: ctx }))) return false;
+  if (await clickConnectorMenuItem({ page: ctx.page, connectorName: ctx.connectorName }))
+    return true;
   return clickConnectorFromMoreMenu(ctx);
 }
 
-
 // --- connector/open-connector-details-panel.ts ---
-
-
 
 /** Context for {@link openConnectorDetailsPanel}. */
 interface OpenConnectorDetailsPanelContext {
@@ -2779,15 +2776,16 @@ interface OpenConnectorDetailsPanelContext {
 
 /** Click an existing connector in the list and open its detail panel. */
 async function openConnectorDetailsPanel(ctx: OpenConnectorDetailsPanelContext): Promise<boolean> {
-  const button = await findConnectorButton({ page: ctx.setup.page, connectorName: ctx.setup.connectorName });
+  const button = await findConnectorButton({
+    page: ctx.setup.page,
+    connectorName: ctx.setup.connectorName,
+  });
   if (!button) return false;
   await clickConnectorDetailsButton({ button, setup: ctx.setup });
   return true;
 }
 
-
 // --- connector/open-connector-list.ts ---
-
 
 /** Context for {@link openConnectorList}. */
 interface OpenConnectorListContext {
@@ -2797,7 +2795,9 @@ interface OpenConnectorListContext {
 
 /** Navigate to the connector list and back out of any open detail panel. */
 async function openConnectorList(ctx: OpenConnectorListContext): Promise<void> {
-  await ctx.page.goto("https://chatgpt.com/#settings/Connectors", { waitUntil: "domcontentloaded" }).catch(() => {});
+  await ctx.page
+    .goto("https://chatgpt.com/#settings/Connectors", { waitUntil: "domcontentloaded" })
+    .catch(() => {});
   await ctx.page.waitForTimeout(1_000);
   const backButton = await firstVisible({
     page: ctx.page,
@@ -2809,9 +2809,7 @@ async function openConnectorList(ctx: OpenConnectorListContext): Promise<void> {
   }
 }
 
-
 // --- connector/open-create-connector-form.ts ---
-
 
 /** Open the connector/app creation form from settings. */
 async function openCreateConnectorForm(ctx: ConnectorSetupContext): Promise<void> {
@@ -2832,14 +2830,13 @@ async function openCreateConnectorForm(ctx: ConnectorSetupContext): Promise<void
   if (opened) {
     ctx.result.steps.push("Opened connector/app creation form.");
   } else {
-    ctx.result.warnings.push("Could not find Create app/Add connector. Use Settings -> Apps -> Advanced settings -> Create app manually.");
+    ctx.result.warnings.push(
+      "Could not find Create app/Add connector. Use Settings -> Apps -> Advanced settings -> Create app manually.",
+    );
   }
 }
 
-
 // --- connector/open-existing-connector-details.ts ---
-
-
 
 /** Context for {@link readConnectorState}. */
 interface ReadConnectorStateContext {
@@ -2857,24 +2854,28 @@ function readConnectorState(ctx: ReadConnectorStateContext) {
 }
 
 /** Open an existing connector's detail panel and classify its URL state. */
-async function openExistingConnectorDetails(ctx: ConnectorSetupContext): Promise<ExistingConnectorState> {
+async function openExistingConnectorDetails(
+  ctx: ConnectorSetupContext,
+): Promise<ExistingConnectorState> {
   const alreadyOpen = await readConnectorState({ setup: ctx });
   if (alreadyOpen !== "missing") return alreadyOpen;
-  if (!await openConnectorDetailsPanel({ setup: ctx })) return "missing";
+  if (!(await openConnectorDetailsPanel({ setup: ctx }))) return "missing";
   return readConnectorState({ setup: ctx });
 }
 
-
 // --- connector/open-settings-from-account-menu.ts ---
-
-
-
 
 /** Open ChatGPT settings through the account menu when the deep link fails. */
 async function openSettingsFromAccountMenu(ctx: ConnectorSetupContext): Promise<void> {
   await ctx.page.goto("https://chatgpt.com/", { waitUntil: "domcontentloaded" }).catch(() => {});
   await ctx.page.waitForSelector(SELECTORS.promptInput, { timeout: 15_000 }).catch(() => {});
-  if (!await clickFirstVisible({ page: ctx.page, selectors: SELECTORS.accountMenuButton, timeout: 2_000 })) {
+  if (
+    !(await clickFirstVisible({
+      page: ctx.page,
+      selectors: SELECTORS.accountMenuButton,
+      timeout: 2_000,
+    }))
+  ) {
     ctx.result.warnings.push("Could not find the ChatGPT profile/account menu.");
     return;
   }
@@ -2882,10 +2883,7 @@ async function openSettingsFromAccountMenu(ctx: ConnectorSetupContext): Promise<
   await clickSettingsEntry({ setup: ctx });
 }
 
-
 // --- connector/read-connector-summary-at-index.ts ---
-
-
 
 /** Context for {@link readConnectorSummaryAtIndex}. */
 interface ReadConnectorSummaryAtIndexContext {
@@ -2897,14 +2895,11 @@ interface ReadConnectorSummaryAtIndexContext {
 
 /** Open one connector by index and read its summary panel. */
 async function readConnectorSummaryAtIndex(ctx: ReadConnectorSummaryAtIndexContext) {
-  if (!await clickConnectorListEntry({ page: ctx.page, index: ctx.index })) return null;
+  if (!(await clickConnectorListEntry({ page: ctx.page, index: ctx.index }))) return null;
   return readOpenConnectorSummary({ page: ctx.page });
 }
 
-
 // --- connector/read-open-connector-state.ts ---
-
-
 
 /** Context for {@link readOpenConnectorState}. */
 interface ReadOpenConnectorStateContext {
@@ -2917,19 +2912,18 @@ interface ReadOpenConnectorStateContext {
 }
 
 /** Classify the open connector panel relative to the desired connector URL. */
-async function readOpenConnectorState(ctx: ReadOpenConnectorStateContext): Promise<ExistingConnectorState> {
+async function readOpenConnectorState(
+  ctx: ReadOpenConnectorStateContext,
+): Promise<ExistingConnectorState> {
   const text = await settingsDialogText({ page: ctx.page });
-  if (!text.includes(ctx.connectorName) || !/\b(URL|App Id|Version Id)\b/i.test(text)) return "missing";
+  if (!text.includes(ctx.connectorName) || !/\b(URL|App Id|Version Id)\b/i.test(text))
+    return "missing";
   if (text.includes(ctx.connectorUrl)) return "current";
   if (/\bURL\s+https?:\/\//i.test(text)) return "stale";
   return "unknown";
 }
 
-
 // --- connector/read-open-connector-summary.ts ---
-
-
-
 
 /** Context for {@link parseConnectorSummaryLines}. */
 interface ParseConnectorSummaryLinesContext {
@@ -2938,9 +2932,11 @@ interface ParseConnectorSummaryLinesContext {
 }
 
 /** Parse connector name and metadata lines from an open settings dialog. */
-function parseConnectorSummaryLines(ctx: ParseConnectorSummaryLinesContext): ConnectorAppSummary | null {
+function parseConnectorSummaryLines(
+  ctx: ParseConnectorSummaryLinesContext,
+): ConnectorAppSummary | null {
   const backIndex = ctx.lines.indexOf("Back");
-  const name = backIndex >= 0 ? ctx.lines[backIndex + 1] ?? "" : "";
+  const name = backIndex >= 0 ? (ctx.lines[backIndex + 1] ?? "") : "";
   if (!name.startsWith(BRIDGE_CONNECTOR_PREFIX)) return null;
   return {
     name,
@@ -2956,15 +2952,22 @@ interface ReadOpenConnectorSummaryContext {
 }
 
 /** Read connector details from the currently open settings dialog. */
-async function readOpenConnectorSummary(ctx: ReadOpenConnectorSummaryContext): Promise<ConnectorAppSummary | null> {
-  const text = await ctx.page.locator('[role="dialog"]').last().innerText().catch(() => "");
-  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+async function readOpenConnectorSummary(
+  ctx: ReadOpenConnectorSummaryContext,
+): Promise<ConnectorAppSummary | null> {
+  const text = await ctx.page
+    .locator('[role="dialog"]')
+    .last()
+    .innerText()
+    .catch(() => "");
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
   return parseConnectorSummaryLines({ lines });
 }
 
-
 // --- connector/refresh-open-connector.ts ---
-
 
 /** Refresh the currently open connector tool schema when the button is visible. */
 async function refreshOpenConnectorIfPresent(ctx: ConnectorSetupContext): Promise<boolean> {
@@ -2975,10 +2978,7 @@ async function refreshOpenConnectorIfPresent(ctx: ConnectorSetupContext): Promis
   });
 }
 
-
 // --- connector/restore-after-connector-setup.ts ---
-
-
 
 /** Close settings and restore the pre-setup URL after a failed automatic setup. */
 async function restoreAfterConnectorSetup(ctx: ConnectorSetupContext): Promise<void> {
@@ -2986,10 +2986,7 @@ async function restoreAfterConnectorSetup(ctx: ConnectorSetupContext): Promise<v
   await restoreReturnUrlIfNeeded(ctx);
 }
 
-
 // --- connector/restore-return-url.ts ---
-
-
 
 /** Restore the pre-setup ChatGPT URL and wait for the composer when needed. */
 async function restoreReturnUrlIfNeeded(ctx: ConnectorSetupContext): Promise<void> {
@@ -2999,9 +2996,7 @@ async function restoreReturnUrlIfNeeded(ctx: ConnectorSetupContext): Promise<voi
   await ctx.page.waitForSelector(SELECTORS.promptInput, { timeout: 15_000 }).catch(() => {});
 }
 
-
 // --- connector/return-to-connector-list.ts ---
-
 
 /** Navigate back to the connector list from a detail panel when Back is visible. */
 async function returnToConnectorListIfNeeded(ctx: ConnectorSetupContext): Promise<void> {
@@ -3015,9 +3010,7 @@ async function returnToConnectorListIfNeeded(ctx: ConnectorSetupContext): Promis
   }
 }
 
-
 // --- connector/select-connector-after-setup.ts ---
-
 
 /** Select the connector in the composer after settings setup completes. */
 async function selectConnectorAfterSetup(ctx: ConnectorSetupContext): Promise<void> {
@@ -3025,15 +3018,13 @@ async function selectConnectorAfterSetup(ctx: ConnectorSetupContext): Promise<vo
   if (selectedInComposer) {
     ctx.result.steps.push("Selected the connector in the composer.");
   } else {
-    ctx.result.warnings.push("Connector is configured, but the composer menu did not expose it for automatic selection.");
+    ctx.result.warnings.push(
+      "Connector is configured, but the composer menu did not expose it for automatic selection.",
+    );
   }
 }
 
-
 // --- connector/select-connector-in-composer.ts ---
-
-
-
 
 /** Select the configured connector in the ChatGPT composer plus-menu. */
 async function selectConnectorInComposer(ctx: ConnectorSetupContext): Promise<boolean> {
@@ -3043,14 +3034,12 @@ async function selectConnectorInComposer(ctx: ConnectorSetupContext): Promise<bo
   return ensureComposerConnectorSelected(ctx);
 }
 
-
 // --- connector/select-no-authentication.ts ---
-
 
 /** Select the no-authentication option in the connector form when present. */
 async function selectNoAuthenticationIfPresent(ctx: ConnectorSetupContext): Promise<boolean> {
   const authSelect = ctx.page.locator("select#custom-connector-auth").first();
-  if (await authSelect.count() > 0 && await authSelect.isVisible().catch(() => false)) {
+  if ((await authSelect.count()) > 0 && (await authSelect.isVisible().catch(() => false))) {
     await authSelect.selectOption("NONE");
     await authSelect.dispatchEvent("change").catch(() => {});
     return true;
@@ -3073,9 +3062,7 @@ async function selectNoAuthenticationIfPresent(ctx: ConnectorSetupContext): Prom
   });
 }
 
-
 // --- connector/settings-dialog-text.ts ---
-
 
 /** Context for {@link settingsDialogText}. */
 interface SettingsDialogTextContext {
@@ -3086,15 +3073,15 @@ interface SettingsDialogTextContext {
 /** Read normalized text from the last open settings dialog. */
 async function settingsDialogText(ctx: SettingsDialogTextContext): Promise<string> {
   return normalizeDisplayText({
-    value: await ctx.page.locator('[role="dialog"]').last().innerText().catch(() => ""),
+    value: await ctx.page
+      .locator('[role="dialog"]')
+      .last()
+      .innerText()
+      .catch(() => ""),
   });
 }
 
-
 // --- connector/setup-connector.ts ---
-
-
-
 
 /** Best-effort ChatGPT Developer Mode connector setup through the browser UI. */
 async function setupMcpConnectorInChatGpt(
@@ -3105,11 +3092,7 @@ async function setupMcpConnectorInChatGpt(
   return executeConnectorSetup(initConnectorSetupContext({ page, connectorUrl, options }));
 }
 
-
 // --- connector/submit-connector-form.ts ---
-
-
-
 
 /** Context for {@link connectorFormStillOpen}. */
 interface ConnectorFormStillOpenContext {
@@ -3119,7 +3102,9 @@ interface ConnectorFormStillOpenContext {
 
 /** True when the connector URL field is still visible after submit. */
 async function connectorFormStillOpen(ctx: ConnectorFormStillOpenContext): Promise<boolean> {
-  return ctx.setup.page.locator('input[name="custom-connector-url"], #custom-connector-url').first()
+  return ctx.setup.page
+    .locator('input[name="custom-connector-url"], #custom-connector-url')
+    .first()
     .isVisible()
     .catch(() => false);
 }
@@ -3131,7 +3116,9 @@ interface MarkConnectorSubmitCompletedContext {
 }
 
 /** Mark connector setup complete and select the connector in the composer. */
-async function markConnectorSubmitCompleted(ctx: MarkConnectorSubmitCompletedContext): Promise<void> {
+async function markConnectorSubmitCompleted(
+  ctx: MarkConnectorSubmitCompletedContext,
+): Promise<void> {
   ctx.setup.result.completed = true;
   ctx.setup.result.steps.push("Submitted the connector form.");
   await selectConnectorAfterSetup(ctx.setup);
@@ -3144,7 +3131,9 @@ interface WarnConnectorSubmitIncompleteContext {
 }
 
 /** Warn when the connector form remains open after submit. */
-async function warnConnectorSubmitIncomplete(ctx: WarnConnectorSubmitIncompleteContext): Promise<void> {
+async function warnConnectorSubmitIncomplete(
+  ctx: WarnConnectorSubmitIncompleteContext,
+): Promise<void> {
   const appVisible = await waitForConnectorButton({
     page: ctx.setup.page,
     connectorName: ctx.setup.connectorName,
@@ -3152,7 +3141,9 @@ async function warnConnectorSubmitIncomplete(ctx: WarnConnectorSubmitIncompleteC
   });
   const formStillOpen = await connectorFormStillOpen({ setup: ctx.setup });
   if (formStillOpen && !appVisible) {
-    ctx.setup.result.warnings.push("Connector form is still open after submit. Check the visible validation message in ChatGPT settings.");
+    ctx.setup.result.warnings.push(
+      "Connector form is still open after submit. Check the visible validation message in ChatGPT settings.",
+    );
     return;
   }
   await markConnectorSubmitCompleted({ setup: ctx.setup });
@@ -3171,16 +3162,15 @@ async function submitConnectorForm(ctx: ConnectorSetupContext): Promise<void> {
     timeout: 2_000,
   });
   if (!submitted) {
-    ctx.result.warnings.push("Connector form was filled, but no Create/Save/Add button was visible or enabled.");
+    ctx.result.warnings.push(
+      "Connector form was filled, but no Create/Save/Add button was visible or enabled.",
+    );
     return;
   }
   await warnConnectorSubmitIncomplete({ setup: ctx });
 }
 
-
 // --- connector/try-finalize-existing-connector.ts ---
-
-
 
 /** Context for {@link finalizeIfCurrentConnector}. */
 interface FinalizeIfCurrentConnectorContext {
@@ -3189,7 +3179,9 @@ interface FinalizeIfCurrentConnectorContext {
 }
 
 /** Open existing connector details and finalize when the URL already matches. */
-async function finalizeIfCurrentConnector(ctx: FinalizeIfCurrentConnectorContext): Promise<boolean> {
+async function finalizeIfCurrentConnector(
+  ctx: FinalizeIfCurrentConnectorContext,
+): Promise<boolean> {
   const existing = await openExistingConnectorDetails(ctx.setup);
   if (existing !== "current") return false;
   await finalizeCurrentConnector(ctx.setup);
@@ -3205,29 +3197,28 @@ interface TryFinalizeExistingConnectorContext {
 }
 
 /** Attempt to finalize when an existing connector already matches the desired URL. */
-async function tryFinalizeExistingConnector(ctx: TryFinalizeExistingConnectorContext): Promise<boolean> {
-  if (ctx.hasCurrentConnector && await finalizeIfCurrentConnector({ setup: ctx.setup })) return true;
+async function tryFinalizeExistingConnector(
+  ctx: TryFinalizeExistingConnectorContext,
+): Promise<boolean> {
+  if (ctx.hasCurrentConnector && (await finalizeIfCurrentConnector({ setup: ctx.setup })))
+    return true;
   return finalizeIfCurrentConnector({ setup: ctx.setup });
 }
 
-
 // --- conversation/capture-all-messages.ts ---
-
-
 
 /** Extract all messages from the current conversation in DOM order. */
 async function captureAllMessages(page: Page): Promise<Array<{ role: string; content: string }>> {
   return extractAllMessages(page, { conversationId: conversationIdFromPage({ page }) });
 }
 
-
 // --- conversation/capture-last-response.ts ---
 
-
-
-
 function sanitizeCapturedText(value: string): string {
-  return value.replace(/\s*\[object Object\]\s*/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .replace(/\s*\[object Object\]\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** Extract the text content of the last assistant response. */
@@ -3246,7 +3237,6 @@ async function captureLastResponse(page: Page): Promise<string> {
   return sanitizeCapturedText(fallback) || cleaned;
 }
 
-
 // --- conversation/conversation-id-from-page.ts ---
 
 /** Context for {@link conversationIdFromPage}. */
@@ -3261,15 +3251,12 @@ function conversationIdFromPage(ctx: ConversationIdFromPageContext): string {
   return match?.[1] ?? "current";
 }
 
-
 // --- conversation/count-assistant-responses.ts ---
-
 
 /** Count assistant responses currently rendered in the conversation. */
 async function countAssistantResponses(page: Page): Promise<number> {
   return page.locator(SELECTORS.responseBlock).count();
 }
-
 
 // --- conversation/navigate-to-conversation.ts ---
 
@@ -3291,14 +3278,15 @@ async function waitForGenerationIdle(page: Page, timeoutMs = 120_000): Promise<v
 async function navigateToConversation(page: Page, url: string): Promise<void> {
   const targetUrl = conversationUrlFromIdOrUrl(url);
   if (isSameChatGptConversation(page.url(), targetUrl)) {
-    await page.waitForSelector("#prompt-textarea, [contenteditable]", { timeout: 30_000 }).catch(() => {});
+    await page
+      .waitForSelector("#prompt-textarea, [contenteditable]", { timeout: 30_000 })
+      .catch(() => {});
     return;
   }
   await waitForGenerationIdle(page);
   await page.goto(targetUrl);
   await page.waitForSelector("#prompt-textarea, [contenteditable]", { timeout: 30_000 });
 }
-
 
 // --- conversation/new-conversation.ts ---
 
@@ -3307,7 +3295,6 @@ async function newConversation(page: Page): Promise<void> {
   await page.goto("https://chatgpt.com/");
   await page.waitForSelector("#prompt-textarea, [contenteditable]", { timeout: 30_000 });
 }
-
 
 // --- conversation/parse-sidebar-link.ts ---
 
@@ -3328,7 +3315,9 @@ interface ParseSidebarLinkContext {
 }
 
 /** Parse one sidebar link into a conversation entry, or null when incomplete. */
-async function parseSidebarLink(ctx: ParseSidebarLinkContext): Promise<SidebarConversationEntry | null> {
+async function parseSidebarLink(
+  ctx: ParseSidebarLinkContext,
+): Promise<SidebarConversationEntry | null> {
   const href = await ctx.link.getAttribute("href");
   const title = await ctx.link.innerText();
   if (!href || !title) return null;
@@ -3336,13 +3325,12 @@ async function parseSidebarLink(ctx: ParseSidebarLinkContext): Promise<SidebarCo
   return { id, title: title.trim(), url: `https://chatgpt.com${href}` };
 }
 
-
 // --- conversation/read-sidebar-conversations.ts ---
 
-
-
 /** Read the conversation list from the sidebar. */
-async function readSidebarConversations(page: Page): Promise<Array<{ id: string; title: string; url: string }>> {
+async function readSidebarConversations(
+  page: Page,
+): Promise<Array<{ id: string; title: string; url: string }>> {
   const links = await page.locator(SELECTORS.sidebarConversation).all();
   const conversations: Array<{ id: string; title: string; url: string }> = [];
   for (const link of links) {
@@ -3352,9 +3340,7 @@ async function readSidebarConversations(page: Page): Promise<Array<{ id: string;
   return conversations;
 }
 
-
 // --- dom/click-first-visible.ts ---
-
 
 /** Context for {@link clickFirstVisible}. */
 interface ClickFirstVisibleContext {
@@ -3372,7 +3358,7 @@ async function clickFirstVisible(ctx: ClickFirstVisibleContext): Promise<boolean
   for (const selector of ctx.selectors) {
     const locator = ctx.page.locator(selector).first();
     await locator.waitFor({ state: "visible", timeout }).catch(() => {});
-    if (await locator.count() > 0 && await locator.isVisible().catch(() => false)) {
+    if ((await locator.count()) > 0 && (await locator.isVisible().catch(() => false))) {
       try {
         await locator.click({ timeout });
         return true;
@@ -3381,7 +3367,7 @@ async function clickFirstVisible(ctx: ClickFirstVisibleContext): Promise<boolean
           await locator.click({ timeout, force: true });
           return true;
         } catch {
-          continue;
+          // both click attempts failed; fall through to the next candidate locator
         }
       }
     }
@@ -3389,9 +3375,7 @@ async function clickFirstVisible(ctx: ClickFirstVisibleContext): Promise<boolean
   return false;
 }
 
-
 // --- dom/fill-first-visible.ts ---
-
 
 /** Context for {@link fillFirstVisible}. */
 interface FillFirstVisibleContext {
@@ -3426,7 +3410,6 @@ async function fillFirstVisible(ctx: FillFirstVisibleContext): Promise<boolean> 
   return true;
 }
 
-
 // --- dom/first-visible-in.ts ---
 
 /** Context for {@link firstVisibleIn}. */
@@ -3441,16 +3424,14 @@ interface FirstVisibleInContext {
 async function firstVisibleIn(ctx: FirstVisibleInContext): Promise<Locator | null> {
   for (const selector of ctx.selectors) {
     const locator = ctx.parent.locator(selector).first();
-    if (await locator.count() > 0 && await locator.isVisible().catch(() => false)) {
+    if ((await locator.count()) > 0 && (await locator.isVisible().catch(() => false))) {
       return locator;
     }
   }
   return null;
 }
 
-
 // --- dom/first-visible.ts ---
-
 
 /** Context for {@link firstVisible}. */
 interface FirstVisibleContext {
@@ -3464,13 +3445,12 @@ interface FirstVisibleContext {
 async function firstVisible(ctx: FirstVisibleContext): Promise<Locator | null> {
   for (const selector of ctx.selectors) {
     const locator = ctx.page.locator(selector).first();
-    if (await locator.count() > 0 && await locator.isVisible().catch(() => false)) {
+    if ((await locator.count()) > 0 && (await locator.isVisible().catch(() => false))) {
       return locator;
     }
   }
   return null;
 }
-
 
 // --- dom/normalize-display-text.ts ---
 /** Context for {@link normalizeDisplayText}. */
@@ -3486,7 +3466,6 @@ function normalizeDisplayText(ctx: NormalizeDisplayTextContext): string {
     .replace(/\b(current|selected)\b/gi, "")
     .trim();
 }
-
 
 // --- dom/normalize-model-query.ts ---
 /** Context for {@link normalizeModelQuery}. */
@@ -3505,15 +3484,10 @@ function normalizeModelQuery(ctx: NormalizeModelQueryContext): string {
     .trim();
 }
 
-
 // --- guest-session-error.ts ---
 // GuestSessionError exported at top of file.
 
-
 // --- model/click-model-and-detect.ts ---
-
-
-
 
 /** Context for {@link clickModelAndDetect}. */
 interface ClickModelAndDetectContext {
@@ -3526,16 +3500,15 @@ interface ClickModelAndDetectContext {
 /** Click a model item, wait for the menu to close, and return the detected model. */
 async function clickModelAndDetect(ctx: ClickModelAndDetectContext): Promise<string> {
   await ctx.item.click();
-  await ctx.page.locator(SELECTORS.openMenu).waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
+  await ctx.page
+    .locator(SELECTORS.openMenu)
+    .waitFor({ state: "hidden", timeout: 5_000 })
+    .catch(() => {});
   await ctx.page.waitForTimeout(500);
   return detectCurrentModel(ctx.page);
 }
 
-
 // --- model/collect-models-from-items.ts ---
-
-
-
 
 /** Context for {@link collectModelsFromItems}. */
 interface CollectModelsFromItemsContext {
@@ -3566,10 +3539,7 @@ async function closeModelMenu(ctx: CloseModelMenuContext): Promise<void> {
   await ctx.page.keyboard.press("Escape").catch(() => {});
 }
 
-
 // --- model/detect-checked-model-from-menu.ts ---
-
-
 
 /** Context for {@link detectCheckedModelFromMenuOnce}. */
 interface DetectCheckedModelFromMenuOnceContext {
@@ -3578,7 +3548,9 @@ interface DetectCheckedModelFromMenuOnceContext {
 }
 
 /** Try once to read the checked model from the model menu. */
-async function detectCheckedModelFromMenuOnce(ctx: DetectCheckedModelFromMenuOnceContext): Promise<string | null> {
+async function detectCheckedModelFromMenuOnce(
+  ctx: DetectCheckedModelFromMenuOnceContext,
+): Promise<string | null> {
   try {
     await openModelMenu({ page: ctx.page });
     const checkedModel = await readCheckedModelFromOpenMenu({ page: ctx.page });
@@ -3597,7 +3569,9 @@ interface DetectCheckedModelFromMenuContext {
 }
 
 /** Retry opening the model menu until a checked model label is found. */
-async function detectCheckedModelFromMenu(ctx: DetectCheckedModelFromMenuContext): Promise<string | null> {
+async function detectCheckedModelFromMenu(
+  ctx: DetectCheckedModelFromMenuContext,
+): Promise<string | null> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const checkedModel = await detectCheckedModelFromMenuOnce({ page: ctx.page });
     if (checkedModel) return checkedModel;
@@ -3606,11 +3580,7 @@ async function detectCheckedModelFromMenu(ctx: DetectCheckedModelFromMenuContext
   return null;
 }
 
-
 // --- model/detect-current-model.ts ---
-
-
-
 
 /** Detect the currently selected ChatGPT model from the page DOM. */
 async function detectCurrentModel(page: Page): Promise<string> {
@@ -3626,11 +3596,7 @@ async function detectCurrentModel(page: Page): Promise<string> {
   }
 }
 
-
 // --- model/find-model-menu-match.ts ---
-
-
-
 
 /** Context for {@link findModelMenuMatch}. */
 interface FindModelMenuMatchContext {
@@ -3652,13 +3618,11 @@ async function findModelMenuMatch(ctx: FindModelMenuMatchContext): Promise<Locat
   return fallback;
 }
 
-
 // --- model/is-likely-model-label.ts ---
 /** True when a string looks like a real ChatGPT model name (vs. arbitrary UI text). */
 function isLikelyModelLabel(value: string): boolean {
   return /\b(gpt|chatgpt|o[1-9]|claude|glm)\b/i.test(value);
 }
-
 
 // --- model/is-selected-model-item.ts ---
 
@@ -3676,11 +3640,7 @@ async function isSelectedModelItem(ctx: IsSelectedModelItemContext): Promise<boo
   return dataState === "checked";
 }
 
-
 // --- model/list-available-models.ts ---
-
-
-
 
 /** Read available models from ChatGPT's model menu. */
 async function listAvailableModels(page: Page) {
@@ -3691,12 +3651,7 @@ async function listAvailableModels(page: Page) {
   return models;
 }
 
-
 // --- model/model-item-matches-query.ts ---
-
-
-
-
 
 /** Context for {@link modelItemMatchesQuery}. */
 interface ModelItemMatchesQueryContext {
@@ -3731,19 +3686,27 @@ function buildModelItemMatchResult(ctx: BuildModelItemMatchResultContext): Model
   if (ctx.searchable === ctx.normalizedQuery || ctx.searchable.includes(ctx.normalizedQuery)) {
     return { matched: true, fallback: null };
   }
-  const fallback = ctx.normalizedQuery.includes(normalizeModelQuery({ value: ctx.label })) ? ctx.item : null;
+  const fallback = ctx.normalizedQuery.includes(normalizeModelQuery({ value: ctx.label }))
+    ? ctx.item
+    : null;
   return { matched: false, fallback };
 }
 
 /** Test whether a menu item matches a normalized model query. */
-async function modelItemMatchesQuery(ctx: ModelItemMatchesQueryContext): Promise<ModelItemMatchResult> {
+async function modelItemMatchesQuery(
+  ctx: ModelItemMatchesQueryContext,
+): Promise<ModelItemMatchResult> {
   const label = await readModelItemLabel({ item: ctx.item });
   const id = await readModelItemId({ item: ctx.item });
   const searchable = normalizeModelQuery({ value: `${label} ${id}` });
   if (!label || !isLikelyModelLabel(label)) return { matched: false, fallback: null };
-  return buildModelItemMatchResult({ item: ctx.item, label, normalizedQuery: ctx.normalizedQuery, searchable });
+  return buildModelItemMatchResult({
+    item: ctx.item,
+    label,
+    normalizedQuery: ctx.normalizedQuery,
+    searchable,
+  });
 }
-
 
 // --- model/model-labels.config.ts ---
 /** Known model data-testid suffixes to human-readable names. */
@@ -3760,34 +3723,31 @@ const MODEL_LABELS: Record<string, string> = {
   "gpt-4o-mini": "GPT-4o Mini",
   "gpt-4-1": "GPT-4.1",
   "gpt-4": "GPT-4",
-  "o1": "o1",
+  o1: "o1",
   "o1-pro": "o1 Pro",
   "o1-mini": "o1 Mini",
   "o3-mini": "o3 Mini",
 };
 
-
 // --- model/model-menu-items.ts ---
-
 
 /** Return all model menu item locators from the open model switcher menu. */
 async function modelMenuItems(page: Page): Promise<Locator[]> {
-  return page.locator(
-    [
-      '[role="menu"] [role="menuitem"]',
-      '[role="menu"] [role="menuitemradio"]',
-      '[data-radix-menu-content] [role="menuitem"]',
-      '[data-radix-menu-content] [role="menuitemradio"]',
-      '[role="menu"] [data-testid^="model-switcher-"]',
-      '[data-radix-menu-content] [data-testid^="model-switcher-"]',
-    ].join(", "),
-  ).all();
+  return page
+    .locator(
+      [
+        '[role="menu"] [role="menuitem"]',
+        '[role="menu"] [role="menuitemradio"]',
+        '[data-radix-menu-content] [role="menuitem"]',
+        '[data-radix-menu-content] [role="menuitemradio"]',
+        '[role="menu"] [data-testid^="model-switcher-"]',
+        '[data-radix-menu-content] [data-testid^="model-switcher-"]',
+      ].join(", "),
+    )
+    .all();
 }
 
-
 // --- model/open-model-menu.ts ---
-
-
 
 /** Context for {@link clickModelTrigger}. */
 interface ClickModelTriggerContext {
@@ -3812,7 +3772,9 @@ interface OpenModelMenuContext {
 
 /** Open the ChatGPT model switcher dropdown menu. */
 async function openModelMenu(ctx: OpenModelMenuContext): Promise<void> {
-  await ctx.page.locator(SELECTORS.modelTrigger.join(", ")).first()
+  await ctx.page
+    .locator(SELECTORS.modelTrigger.join(", "))
+    .first()
     .waitFor({ state: "visible", timeout: 5_000 })
     .catch(() => {});
   const trigger = await firstVisible({ page: ctx.page, selectors: SELECTORS.modelTrigger });
@@ -3821,13 +3783,7 @@ async function openModelMenu(ctx: OpenModelMenuContext): Promise<void> {
   await ctx.page.locator(SELECTORS.openMenu).first().waitFor({ state: "visible", timeout: 5_000 });
 }
 
-
 // --- model/parse-model-menu-item.ts ---
-
-
-
-
-
 
 /** Context for {@link parseModelMenuItem}. */
 interface ParseModelMenuItemContext {
@@ -3844,9 +3800,7 @@ async function parseModelMenuItem(ctx: ParseModelMenuItemContext): Promise<Model
   return { id, label, selected };
 }
 
-
 // --- model/read-checked-model-from-dom.ts ---
-
 
 /** Context for {@link readCheckedModelFromDom}. */
 interface ReadCheckedModelFromDomContext {
@@ -3855,19 +3809,17 @@ interface ReadCheckedModelFromDomContext {
 }
 
 /** Read the checked model from aria-checked switcher items in the DOM. */
-async function readCheckedModelFromDom(ctx: ReadCheckedModelFromDomContext): Promise<string | null> {
+async function readCheckedModelFromDom(
+  ctx: ReadCheckedModelFromDomContext,
+): Promise<string | null> {
   const checked = ctx.page.locator('[data-testid^="model-switcher-"][aria-checked="true"]').first();
-  if (await checked.count() > 0) {
+  if ((await checked.count()) > 0) {
     return readModelItemLabel({ item: checked });
   }
   return null;
 }
 
-
 // --- model/read-checked-model-from-open-menu.ts ---
-
-
-
 
 /** Context for {@link readCheckedModelFromOpenMenu}. */
 interface ReadCheckedModelFromOpenMenuContext {
@@ -3876,7 +3828,9 @@ interface ReadCheckedModelFromOpenMenuContext {
 }
 
 /** Read the label of the checked model item from an already-open menu. */
-async function readCheckedModelFromOpenMenu(ctx: ReadCheckedModelFromOpenMenuContext): Promise<string | null> {
+async function readCheckedModelFromOpenMenu(
+  ctx: ReadCheckedModelFromOpenMenuContext,
+): Promise<string | null> {
   const items = await modelMenuItems(ctx.page);
   for (const item of items) {
     if (await isSelectedModelItem({ item })) {
@@ -3887,9 +3841,7 @@ async function readCheckedModelFromOpenMenu(ctx: ReadCheckedModelFromOpenMenuCon
   return null;
 }
 
-
 // --- model/read-likely-aria-model-label.ts ---
-
 
 /** Context for {@link readLikelyAriaModelLabel}. */
 interface ReadLikelyAriaModelLabelContext {
@@ -3898,11 +3850,12 @@ interface ReadLikelyAriaModelLabelContext {
 }
 
 /** Read a model label from the trigger aria-label when it looks valid. */
-async function readLikelyAriaModelLabel(ctx: ReadLikelyAriaModelLabelContext): Promise<string | null> {
+async function readLikelyAriaModelLabel(
+  ctx: ReadLikelyAriaModelLabelContext,
+): Promise<string | null> {
   const ariaLabel = await ctx.trigger.getAttribute("aria-label").catch(() => null);
   return ariaLabel && isLikelyModelLabel(ariaLabel) ? ariaLabel.trim() : null;
 }
-
 
 // --- model/read-likely-model-line.ts ---
 
@@ -3917,13 +3870,7 @@ function readLikelyModelLine(ctx: ReadLikelyModelLineContext): string | null {
   return ctx.text.split("\n").find((part) => isLikelyModelLabel(part)) ?? null;
 }
 
-
 // --- model/read-model-from-trigger.ts ---
-
-
-
-
-
 
 /** Context for {@link readModelFromTrigger}. */
 interface ReadModelFromTriggerContext {
@@ -3942,10 +3889,7 @@ async function readModelFromTrigger(ctx: ReadModelFromTriggerContext): Promise<s
   return readLikelyAriaModelLabel({ trigger });
 }
 
-
 // --- model/read-model-item-id.ts ---
-
-
 
 /** Context for {@link readModelItemId}. */
 interface ReadModelItemIdContext {
@@ -3961,10 +3905,7 @@ async function readModelItemId(ctx: ReadModelItemIdContext): Promise<string> {
   return normalizeModelQuery({ value: label }).replace(/\s+/g, "-");
 }
 
-
 // --- model/read-model-item-label.ts ---
-
-
 
 /** Context for {@link readModelItemLabel}. */
 interface ReadModelItemLabelContext {
@@ -3982,14 +3923,7 @@ async function readModelItemLabel(ctx: ReadModelItemLabelContext): Promise<strin
   return normalizeDisplayText({ value: await ctx.item.innerText().catch(() => "") });
 }
 
-
 // --- model/select-model.ts ---
-
-
-
-
-
-
 
 /** Context for {@link selectModelOrThrow}. */
 interface SelectModelOrThrowContext {
@@ -4017,9 +3951,7 @@ async function selectModel(page: Page, query: string): Promise<string> {
   return selectModelOrThrow({ page, query, normalizedQuery });
 }
 
-
 // --- prompt/click-send-button.ts ---
-
 
 /** Context for {@link clickSendButton}. */
 interface ClickSendButtonContext {
@@ -4038,9 +3970,7 @@ async function clickSendButton(ctx: ClickSendButtonContext): Promise<void> {
   }
 }
 
-
 // --- prompt/composer-clears-once.ts ---
-
 
 /** Context for {@link composerClearsOnce}. */
 interface ComposerClearsOnceContext {
@@ -4054,9 +3984,7 @@ async function composerClearsOnce(ctx: ComposerClearsOnceContext): Promise<boole
   return composerText === "";
 }
 
-
 // --- prompt/composer-clears.ts ---
-
 
 /** Context for {@link composerClears}. */
 interface ComposerClearsContext {
@@ -4077,9 +4005,7 @@ async function composerClears(ctx: ComposerClearsContext): Promise<boolean> {
   return false;
 }
 
-
 // --- prompt/inject-prompt.ts ---
-
 
 /**
  * Type a prompt into ChatGPT's input field, send it, and confirm it actually left
@@ -4090,7 +4016,6 @@ async function injectPrompt(page: Page, text: string): Promise<void> {
   await waitForGenerationIdle(page);
   await runInjectPromptAttempts({ page, text });
 }
-
 
 // --- prompt/read-composer-text.ts ---
 
@@ -4108,10 +4033,7 @@ async function readComposerText(ctx: ReadComposerTextContext): Promise<string> {
   return text ?? "";
 }
 
-
 // --- prompt/run-inject-prompt-attempts.ts ---
-
-
 
 /** Context for {@link runInjectPromptAttempts}. */
 interface RunInjectPromptAttemptsContext {
@@ -4130,10 +4052,7 @@ async function runInjectPromptAttempts(ctx: RunInjectPromptAttemptsContext): Pro
   throw new Error("injectPrompt: composer never cleared after 3 send attempts");
 }
 
-
 // --- prompt/submit-prompt-attempt.ts ---
-
-
 
 /** Context for {@link submitPromptAttempt}. */
 interface SubmitPromptAttemptContext {
@@ -4154,7 +4073,6 @@ async function submitPromptAttempt(ctx: SubmitPromptAttemptContext): Promise<boo
   return composerClears({ page: ctx.page });
 }
 
-
 // --- response/is-transient-assistant-text.ts ---
 /** Context for {@link isTransientAssistantText}. */
 interface IsTransientAssistantTextContext {
@@ -4165,17 +4083,17 @@ interface IsTransientAssistantTextContext {
 /** True when assistant text is a transient placeholder such as "Thinking…". */
 function isTransientAssistantText(ctx: IsTransientAssistantTextContext): boolean {
   const normalized = ctx.text.trim().toLowerCase();
-  return normalized === "thinking"
-    || normalized.endsWith(" thinking")
-    || normalized.endsWith(" thinking...")
-    || /^thinking[.\s]*$/.test(normalized)
-    || /^thought for\b/.test(normalized)
-    || normalized.startsWith("thought for ");
+  return (
+    normalized === "thinking" ||
+    normalized.endsWith(" thinking") ||
+    normalized.endsWith(" thinking...") ||
+    /^thinking[.\s]*$/.test(normalized) ||
+    /^thought for\b/.test(normalized) ||
+    normalized.startsWith("thought for ")
+  );
 }
 
-
 // --- response/is-turn-settled.ts ---
-
 
 /**
  * Decide whether the current assistant turn has finished producing output.
@@ -4185,7 +4103,8 @@ function isTransientAssistantText(ctx: IsTransientAssistantTextContext): boolean
 function isTurnSettled(state: TurnSettledState): boolean {
   if (state.streaming) return false;
   if (state.pendingAssetCount > 0) return false;
-  if (state.expectedImageMarkerCount > 0 && state.loadedAssetCount < state.expectedImageMarkerCount) return false;
+  if (state.expectedImageMarkerCount > 0 && state.loadedAssetCount < state.expectedImageMarkerCount)
+    return false;
 
   const awaitingImages = state.expectedImageMarkerCount > 0 || state.assetCount > 0;
   const requiredQuietMs = awaitingImages ? ASSET_SETTLE_QUIET_MS : SETTLE_QUIET_MS;
@@ -4195,7 +4114,6 @@ function isTurnSettled(state: TurnSettledState): boolean {
   if (state.expectedImageMarkerCount > 0) return false;
   return state.hasText && !state.isTransientText;
 }
-
 
 // --- response/remaining-timeout.ts ---
 /** Context for {@link remainingTimeout}. */
@@ -4211,10 +4129,7 @@ function remainingTimeout(ctx: RemainingTimeoutContext): number {
   return Math.max(1_000, ctx.timeout - (Date.now() - ctx.startedAt));
 }
 
-
 // --- response/response-started-after-baseline.ts ---
-
-
 
 /** Context for {@link responseStartedAfterBaseline}. */
 interface ResponseStartedAfterBaselineContext {
@@ -4227,14 +4142,17 @@ interface ResponseStartedAfterBaselineContext {
 }
 
 /** True when a new assistant response has started relative to the baseline. */
-async function responseStartedAfterBaseline(ctx: ResponseStartedAfterBaselineContext): Promise<boolean> {
+async function responseStartedAfterBaseline(
+  ctx: ResponseStartedAfterBaselineContext,
+): Promise<boolean> {
   if (await isStreamingVisible({ page: ctx.page })) return true;
   const count = await ctx.page.locator(SELECTORS.responseBlock).count();
   if (ctx.previousAssistantCount !== undefined && count > ctx.previousAssistantCount) return true;
   const lastText = await readNormalizedLastResponse({ page: ctx.page });
-  return !!ctx.previousLastAssistantText && !!lastText && lastText !== ctx.previousLastAssistantText;
+  return (
+    !!ctx.previousLastAssistantText && !!lastText && lastText !== ctx.previousLastAssistantText
+  );
 }
-
 
 // --- response/response-wait-options.ts ---
 /** Options for {@link waitForResponse}. */
@@ -4247,7 +4165,6 @@ interface ResponseWaitOptions {
   previousLastAssistantText?: string;
 }
 
-
 // --- response/settle-constants.ts ---
 /** Quiet window a plain text turn must hold before it counts as settled. */
 const SETTLE_QUIET_MS = 1_500;
@@ -4255,11 +4172,7 @@ const SETTLE_QUIET_MS = 1_500;
 /** Longer quiet window required when generated assets are present in a turn. */
 const ASSET_SETTLE_QUIET_MS = 12_000;
 
-
 // --- response/streaming-helpers.ts ---
-
-
-
 
 /** Context for {@link isStreamingVisible}. */
 interface IsStreamingVisibleContext {
@@ -4269,7 +4182,11 @@ interface IsStreamingVisibleContext {
 
 /** True when ChatGPT's stop/streaming indicator is visible. */
 async function isStreamingVisible(ctx: IsStreamingVisibleContext): Promise<boolean> {
-  return ctx.page.locator(SELECTORS.streamingIndicator).first().isVisible().catch(() => false);
+  return ctx.page
+    .locator(SELECTORS.streamingIndicator)
+    .first()
+    .isVisible()
+    .catch(() => false);
 }
 
 /** Context for {@link readNormalizedLastResponse}. */
@@ -4283,7 +4200,6 @@ async function readNormalizedLastResponse(ctx: ReadNormalizedLastResponseContext
   const text = await captureLastResponse(ctx.page).catch(() => "");
   return normalizeDisplayText({ value: text });
 }
-
 
 // --- response/turn-settled-state.ts ---
 /** Snapshot of assistant turn state used by {@link isTurnSettled}. */
@@ -4306,12 +4222,7 @@ interface TurnSettledState {
   stableForMs: number;
 }
 
-
 // --- response/turn-snapshot.ts ---
-
-
-
-
 
 /** Context for {@link readTurnSnapshot}. */
 interface ReadTurnSnapshotContext {
@@ -4342,11 +4253,13 @@ function countExpectedImageMarkers(text: string): number {
 
 /** True when two turn snapshots differ in a way that resets the settle timer. */
 function turnSnapshotChanged(previous: TurnSnapshot, next: TurnSnapshot): boolean {
-  return previous.text !== next.text
-    || previous.assetCount !== next.assetCount
-    || previous.loadedAssetCount !== next.loadedAssetCount
-    || previous.pendingAssetCount !== next.pendingAssetCount
-    || previous.expectedImageMarkerCount !== next.expectedImageMarkerCount;
+  return (
+    previous.text !== next.text ||
+    previous.assetCount !== next.assetCount ||
+    previous.loadedAssetCount !== next.loadedAssetCount ||
+    previous.pendingAssetCount !== next.pendingAssetCount ||
+    previous.expectedImageMarkerCount !== next.expectedImageMarkerCount
+  );
 }
 
 /** In-page snapshot of the last assistant turn used for settle detection. */
@@ -4360,13 +4273,13 @@ interface LastAssistantTurnState {
 
 /** Read current assistant turn snapshot from the page. */
 async function readTurnSnapshot(ctx: ReadTurnSnapshotContext): Promise<TurnSnapshot> {
-  const turnState = await ctx.page.evaluate(LAST_ASSISTANT_TURN_STATE_SOURCE).catch(() => ({
+  const turnState = (await ctx.page.evaluate(LAST_ASSISTANT_TURN_STATE_SOURCE).catch(() => ({
     text: "",
     assetCount: 0,
     loadedAssetCount: 0,
     pendingAssetCount: 0,
     expectedImageMarkerCount: 0,
-  })) as LastAssistantTurnState;
+  }))) as LastAssistantTurnState;
   const streaming = await isStreamingVisible({ page: ctx.page });
   const text = normalizeDisplayText({
     value: turnState.text || (await readNormalizedLastResponse({ page: ctx.page })),
@@ -4407,9 +4320,7 @@ function turnSnapshotSettled(ctx: TurnSnapshotSettledContext): boolean {
   });
 }
 
-
 // --- response/wait-for-last-assistant-text-stable.ts ---
-
 
 /** Context for {@link waitForLastAssistantTextStable}. */
 interface WaitForLastAssistantTextStableContext {
@@ -4420,7 +4331,9 @@ interface WaitForLastAssistantTextStableContext {
 }
 
 /** Wait until assistant text and assets hold still long enough to count as settled. */
-async function waitForLastAssistantTextStable(ctx: WaitForLastAssistantTextStableContext): Promise<void> {
+async function waitForLastAssistantTextStable(
+  ctx: WaitForLastAssistantTextStableContext,
+): Promise<void> {
   const startedAt = Date.now();
   let lastSnapshot = await readTurnSnapshot({ page: ctx.page });
   let stableSince = Date.now();
@@ -4436,9 +4349,7 @@ async function waitForLastAssistantTextStable(ctx: WaitForLastAssistantTextStabl
   throw new Error("Timed out waiting for ChatGPT response to settle.");
 }
 
-
 // --- response/wait-for-response-after-baseline.ts ---
-
 
 /** Context for {@link waitForResponseAfterBaseline}. */
 interface WaitForResponseAfterBaselineContext {
@@ -4453,7 +4364,9 @@ interface WaitForResponseAfterBaselineContext {
 }
 
 /** Wait until ChatGPT begins a new response relative to a pre-send baseline. */
-async function waitForResponseAfterBaseline(ctx: WaitForResponseAfterBaselineContext): Promise<void> {
+async function waitForResponseAfterBaseline(
+  ctx: WaitForResponseAfterBaselineContext,
+): Promise<void> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < ctx.timeout) {
     if (await responseStartedAfterBaseline(ctx)) return;
@@ -4462,14 +4375,7 @@ async function waitForResponseAfterBaseline(ctx: WaitForResponseAfterBaselineCon
   throw new Error("Timed out waiting for ChatGPT to start a new response.");
 }
 
-
 // --- response/wait-for-response.ts ---
-
-
-
-
-
-
 
 /** Wait for ChatGPT to finish streaming its response. */
 async function waitForResponse(
@@ -4490,14 +4396,7 @@ async function waitForResponse(
   });
 }
 
-
 // --- response/wait-for-streaming-to-finish.ts ---
-
-
-
-
-
-
 
 /** Context for {@link waitForStreamingToFinish}. */
 interface WaitForStreamingToFinishContext {
@@ -4512,7 +4411,9 @@ interface WaitForStreamingToFinishContext {
 /** Wait for the streaming indicator to appear then disappear. */
 async function waitForStreamingToFinish(ctx: WaitForStreamingToFinishContext): Promise<void> {
   try {
-    await ctx.page.locator(SELECTORS.streamingIndicator).waitFor({ state: "visible", timeout: 10_000 });
+    await ctx.page
+      .locator(SELECTORS.streamingIndicator)
+      .waitFor({ state: "visible", timeout: 10_000 });
     await ctx.page.locator(SELECTORS.streamingIndicator).waitFor({
       state: "hidden",
       timeout: remainingTimeout({ startedAt: ctx.startedAt, timeout: ctx.timeout }),
@@ -4534,10 +4435,11 @@ function parseResponseWaitOptions(options: number | ResponseWaitOptions): {
   return {
     timeout: options.timeout ?? 300_000,
     previousAssistantCount: options.previousAssistantCount,
-    previousLastAssistantText: normalizeDisplayText({ value: options.previousLastAssistantText ?? "" }),
+    previousLastAssistantText: normalizeDisplayText({
+      value: options.previousLastAssistantText ?? "",
+    }),
   };
 }
-
 
 // --- selectors.config.ts ---
 /** DOM selectors for ChatGPT's interface. Subject to change if ChatGPT updates UI. */
@@ -4545,7 +4447,8 @@ const SELECTORS = {
   /** The contenteditable prompt input field. */
   promptInput: '#prompt-textarea, [contenteditable="true"]',
   /** The send button (visible when text is entered). */
-  sendButton: 'button[data-testid="send-button"], button[aria-label="Send prompt"], button[aria-label="Send message"]',
+  sendButton:
+    'button[data-testid="send-button"], button[aria-label="Send prompt"], button[aria-label="Send message"]',
   /** Individual assistant response blocks. */
   responseBlock: '[data-message-author-role="assistant"]',
   /** The most recent response block. */
@@ -4600,19 +4503,20 @@ const SELECTORS = {
   ],
 } as const;
 
-
 // --- session/assert-signed-in.ts ---
-
-
 
 /** Fail fast before sending a prompt to an unauthenticated guest session. */
 async function assertSignedIn(page: Page): Promise<void> {
-  if (await isGuestSession(page)) throw new GuestSessionError();
+  if (await isGuestSession(page)) {
+    throw new GuestSessionError(
+      "ChatGPT is not signed in. " +
+        "This is the bridge's isolated Chrome — not your daily browser. " +
+        "Click Log in in that window, complete sign-in, leave it open, then run again.",
+    );
+  }
 }
 
-
 // --- session/has-guest-login-buttons.ts ---
-
 
 /** Context for {@link hasGuestLoginButtons}. */
 interface HasGuestLoginButtonsContext {
@@ -4628,9 +4532,7 @@ async function hasGuestLoginButtons(ctx: HasGuestLoginButtonsContext): Promise<b
   return signup.isVisible({ timeout: 500 }).catch(() => false);
 }
 
-
 // --- session/has-visible-account-menu.ts ---
-
 
 /** Context for {@link hasVisibleAccountMenu}. */
 interface HasVisibleAccountMenuContext {
@@ -4641,12 +4543,13 @@ interface HasVisibleAccountMenuContext {
 /** True when the signed-in account/profile menu control is visible. */
 async function hasVisibleAccountMenu(ctx: HasVisibleAccountMenuContext): Promise<boolean> {
   const account = ctx.page.locator(SELECTORS.accountMenuButton.join(", "));
-  return account.first().isVisible({ timeout: 2500 }).catch(() => false);
+  return account
+    .first()
+    .isVisible({ timeout: 2500 })
+    .catch(() => false);
 }
 
-
 // --- session/has-visible-composer.ts ---
-
 
 /** Context for {@link hasVisibleComposer}. */
 interface HasVisibleComposerContext {
@@ -4657,14 +4560,13 @@ interface HasVisibleComposerContext {
 /** True when the prompt composer input is visible on the page. */
 async function hasVisibleComposer(ctx: HasVisibleComposerContext): Promise<boolean> {
   const prompt = ctx.page.locator(SELECTORS.promptInput);
-  return prompt.first().isVisible({ timeout: 1500 }).catch(() => false);
+  return prompt
+    .first()
+    .isVisible({ timeout: 1500 })
+    .catch(() => false);
 }
 
-
 // --- session/is-guest-session.ts ---
-
-
-
 
 /** True when ChatGPT is showing the unauthenticated guest shell. */
 async function isGuestSession(page: Page): Promise<boolean> {
@@ -4714,7 +4616,9 @@ export class ChatGptPage implements BrowserProvider {
   }
 
   /** Read conversation entries from the sidebar. */
-  async readSidebarConversations(page: Page): Promise<Array<{ id: string; title: string; url: string }>> {
+  async readSidebarConversations(
+    page: Page,
+  ): Promise<Array<{ id: string; title: string; url: string }>> {
     return readSidebarConversations(page);
   }
 
@@ -4764,7 +4668,11 @@ export class ChatGptPage implements BrowserProvider {
   }
 
   /** Set up the ChatGPT MCP connector in Developer Mode. */
-  async setupMcpConnector(page: Page, url: string, options?: ConnectorSetupOptions): Promise<ConnectorSetupResult> {
+  async setupMcpConnector(
+    page: Page,
+    url: string,
+    options?: ConnectorSetupOptions,
+  ): Promise<ConnectorSetupResult> {
     return setupMcpConnectorInChatGpt(page, url, options);
   }
 }

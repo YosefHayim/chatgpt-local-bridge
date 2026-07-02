@@ -1,11 +1,11 @@
-import type { BrowserManager } from "../providers/chrome/browser-manager.ts";
-import type { McpServerHandle, McpToolAction } from "../tools/server.ts";
-import type { CloudflareTunnel } from "../tunnel/cloudflare-tunnel.class.ts";
-import type { LoadedHooksConfig } from "../user-config/hooks.ts";
 import type { PermissionMode } from "../domain/permissions.ts";
 import type { BridgeConfig, Message } from "../domain/types.ts";
-import type { Orchestrator } from "./orchestrator.ts";
+import type { BrowserManager } from "../providers/chrome/browser-manager.ts";
+import type { McpServerHandle, McpToolAction } from "../tools/server.ts";
+import type { CloudflareTunnel } from "../tunnel/cloudflare-tunnel.ts";
+import type { LoadedHooksConfig } from "../user-config/hooks.ts";
 import type { ContextCounter } from "./bridge-engine.class.ts";
+import type { Orchestrator } from "./orchestrator.ts";
 
 /**
  * Knobs for {@link BridgeEngine.start}. The two frontends (Ink TUI and the headless

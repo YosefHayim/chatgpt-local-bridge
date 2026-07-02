@@ -33,7 +33,10 @@ describe("repo-local config", () => {
   it("forces repoPath from the argument, ignoring a stale value in the file", async () => {
     const repo = await makeRepo();
     await mkdir(bridgeDir(repo), { recursive: true });
-    await writeFile(configPath(repo), JSON.stringify({ repoPath: "/old/stale/path", mcpPort: 7000 }));
+    await writeFile(
+      configPath(repo),
+      JSON.stringify({ repoPath: "/old/stale/path", mcpPort: 7000 }),
+    );
 
     const cfg = await loadConfig(repo);
     expect(cfg.repoPath).toBe(repo);

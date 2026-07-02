@@ -1,6 +1,12 @@
 import { BridgeEngine, mcpConnectorUrl } from "./bridge-engine.class.ts";
 
-export type { StartEngineOptions, AskEngineInput, ShutdownEngineInput, Engine } from "./bridge-engine.types.ts";
+export type {
+  StartEngineOptions,
+  AskEngineInput,
+  ShutdownEngineInput,
+  Engine,
+} from "./bridge-engine.types.ts";
+export type { ContextCounter } from "./bridge-engine.class.ts";
 export { BridgeEngine, mcpConnectorUrl };
 
 /**

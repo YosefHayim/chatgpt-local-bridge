@@ -7,13 +7,14 @@ import {
 } from "@/config";
 import type { BrowserProvider } from "./browserProviderTypes.ts";
 import { CHATGPT_PROVIDER } from "./chatgptProviderConfig.ts";
+import { setupMcpConnectorInClaude } from "./claude/claudeConnector.ts";
 import { GEMINI_PROVIDER } from "./geminiProviderConfig.ts";
-import { GenericWebChatPage } from "./genericWebChatPage.ts";
+import { type ConnectorSetupFn, GenericWebChatPage } from "./genericWebChatPage.ts";
 import { UnknownProviderError } from "./unknownProviderError.ts";
 
-/** Build a generic selector-driven adapter from a provider's config entry. */
-function genericProvider(id: BridgeProviderId): BrowserProvider {
-  return new GenericWebChatPage({ id, ...PROVIDER_CONFIG[id] });
+/** Build a generic selector-driven adapter, optionally with a bespoke connector flow. */
+function genericProvider(id: BridgeProviderId, connectorSetup?: ConnectorSetupFn): BrowserProvider {
+  return new GenericWebChatPage({ id, ...PROVIDER_CONFIG[id] }, connectorSetup);
 }
 
 /**
@@ -25,7 +26,7 @@ function genericProvider(id: BridgeProviderId): BrowserProvider {
 export const PROVIDERS: Record<BridgeProviderId, BrowserProvider> = {
   chatgpt: CHATGPT_PROVIDER,
   gemini: GEMINI_PROVIDER,
-  claude: genericProvider("claude"),
+  claude: genericProvider("claude", setupMcpConnectorInClaude),
   deepseek: genericProvider("deepseek"),
   grok: genericProvider("grok"),
   perplexity: genericProvider("perplexity"),

@@ -1,6 +1,6 @@
 import type { ProviderConfigEntry } from "@/config";
+import type { ModelOption } from "@/features/domain";
 import type { Page } from "playwright";
-import type { ModelOption } from "../domain/types.ts";
 import type { BrowserProvider, ResponseWaitOptions } from "./browserProviderTypes.ts";
 
 /** A provider config entry plus its resolved id — the input to the generic adapter. */

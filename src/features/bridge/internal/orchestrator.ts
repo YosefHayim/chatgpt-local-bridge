@@ -1,14 +1,14 @@
-import type { Page } from "playwright";
-import { findModelProfile } from "../../domain/modelsConfig.ts";
+import { findModelProfile } from "@/features/domain";
 import type {
   BridgeConfig,
   ConnectorSetupResult,
   Message,
   ModelOption,
   ToolResult,
-} from "../../domain/types.ts";
-import { isSameChatGptConversation } from "../../providers/conversationUrl.ts";
-import { type BrowserProvider, getBrowserProvider } from "../../providers/providerRegistry.ts";
+} from "@/features/domain";
+import { isSameChatGptConversation } from "@/features/providers";
+import { type BrowserProvider, getBrowserProvider } from "@/features/providers";
+import type { Page } from "playwright";
 
 /** Options for sending a prompt through the orchestrator. */
 export interface SendPromptOptions {

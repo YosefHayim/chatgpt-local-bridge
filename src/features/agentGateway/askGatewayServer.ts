@@ -1,7 +1,7 @@
+import type { FanoutResult } from "@/features/bridge";
+import { parseProviderList } from "@/features/providers";
 import { McpServer as McpProtocolServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { FanoutResult } from "../bridge/fanoutOrchestrator.ts";
-import { parseProviderList } from "../providers/providerRegistry.ts";
 
 /**
  * The outbound MCP surface: a local agent connects to this server and calls `ask` to

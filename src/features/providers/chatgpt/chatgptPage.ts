@@ -1,7 +1,6 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PROVIDER_CONFIG } from "@/config";
-import type { APIResponse, Locator, Page } from "playwright";
 import type {
   Attachment,
   AttachmentManifest,
@@ -9,7 +8,8 @@ import type {
   ConnectorSetupOptions,
   ConnectorSetupResult,
   ModelOption,
-} from "../../domain/types.ts";
+} from "@/features/domain";
+import type { APIResponse, Locator, Page } from "playwright";
 import type { BrowserProvider } from "../browserProviderTypes.ts";
 import { conversationUrlFromIdOrUrl, isSameChatGptConversation } from "../conversationUrl.ts";
 import { GuestSessionError } from "../guestSessionError.ts";

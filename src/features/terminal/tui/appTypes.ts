@@ -1,5 +1,5 @@
-import type { ContextCounter } from "../../bridge/createEngineFactory.ts";
-import type { BridgeConfig, CommandContext, Message, ModelOption } from "../../domain/types.ts";
+import type { ContextCounter } from "@/features/bridge";
+import type { BridgeConfig, CommandContext, Message, ModelOption } from "@/features/domain";
 
 /** Result of attempting to send or queue a prompt. */
 export type PromptSendResult = "sent" | "queued";

@@ -1,4 +1,4 @@
-import type { ContextCounter } from "../../bridge/createEngineFactory.ts";
+import type { ContextCounter } from "@/features/bridge";
 import type { StatusBarProps } from "./StatusBar.tsx";
 import type { AppProps } from "./appTypes.ts";
 

@@ -69,8 +69,12 @@ for (const file of files) {
   const text = await readFile(file, "utf8");
   for (const match of text.matchAll(IMPORT_RE)) {
     const spec = match[1];
-    if (!spec.startsWith(".")) continue;
-    const target = resolve(dirname(file), spec);
+    // Resolve both relative imports and the `@/` alias (@/* → src/*) so cross-feature
+    // access via `@/features/<x>` is checked too — not just relative paths.
+    let target;
+    if (spec.startsWith("@/")) target = join(REPO_ROOT, "src", spec.slice(2));
+    else if (spec.startsWith(".")) target = resolve(dirname(file), spec);
+    else continue;
     const targetFeature = featureOf(target);
     if (!targetFeature || targetFeature === srcFeature) continue;
     if (await declaresServiceClass(target)) {

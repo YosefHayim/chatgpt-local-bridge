@@ -1,21 +1,17 @@
 import { execFile } from "node:child_process";
-import {
-  type ModelProfile,
-  UNKNOWN_MODEL_PROFILE,
-  findModelProfile,
-} from "../../domain/modelsConfig.ts";
-import { type PermissionMode, normalizePermissionMode } from "../../domain/permissions.ts";
-import type { BridgeConfig, Message } from "../../domain/types.ts";
-import { BrowserManager } from "../../providers/chrome/browserManager.ts";
-import { getBrowserProvider, normalizeProvider } from "../../providers/providerRegistry.ts";
-import { resolveFileMentions } from "../../store/fileResolver.ts";
-import { appendBridgeLog } from "../../store/logging.ts";
-import { ensureBridgeDir, sessionsDir } from "../../store/paths.ts";
-import { appendSessionEvent, createSession, updateSession } from "../../store/sessionStore.ts";
-import { type McpServerHandle, type McpToolAction, startMcpServer } from "../../tools/server.ts";
-import { CloudflareTunnel } from "../../tunnel/cloudflareTunnel.ts";
-import { runHooks } from "../../user-config/hooks.ts";
-import { loadHooksConfig } from "../../user-config/hooks.ts";
+import { type ModelProfile, UNKNOWN_MODEL_PROFILE, findModelProfile } from "@/features/domain";
+import { type PermissionMode, normalizePermissionMode } from "@/features/domain";
+import type { BridgeConfig, Message } from "@/features/domain";
+import { BrowserManager } from "@/features/providers";
+import { getBrowserProvider, normalizeProvider } from "@/features/providers";
+import { resolveFileMentions } from "@/features/store";
+import { appendBridgeLog } from "@/features/store";
+import { ensureBridgeDir, sessionsDir } from "@/features/store";
+import { appendSessionEvent, createSession, updateSession } from "@/features/store";
+import { type McpServerHandle, type McpToolAction, startMcpServer } from "@/features/tools";
+import { CloudflareTunnel } from "@/features/tunnel";
+import { runHooks } from "@/features/user-config";
+import { loadHooksConfig } from "@/features/user-config";
 import type {
   AskEngineInput,
   BuildEngineContext,

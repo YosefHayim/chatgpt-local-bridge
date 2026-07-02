@@ -4,23 +4,20 @@ import { readFile, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
+import type { PermissionMode } from "@/features/domain";
+import { evaluateToolPermission, permissionDecisionToToolResult } from "@/features/domain";
+import type { ToolDef, ToolResult } from "@/features/domain";
+import { loadManifest } from "@/features/providers";
+import { createCheckpoint } from "@/features/store";
+import { appendBridgeLog } from "@/features/store";
+import type { HookDefinition } from "@/features/user-config";
+import { runHooks } from "@/features/user-config";
 import { McpServer as McpProtocolServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { Page } from "playwright";
 import { z } from "zod";
-import type { PermissionMode } from "../../domain/permissions.ts";
-import {
-  evaluateToolPermission,
-  permissionDecisionToToolResult,
-} from "../../domain/permissions.ts";
-import type { ToolDef, ToolResult } from "../../domain/types.ts";
-import { loadManifest } from "../../providers/attachments.ts";
-import { createCheckpoint } from "../../store/checkpoints.ts";
-import { appendBridgeLog } from "../../store/logging.ts";
-import type { HookDefinition } from "../../user-config/hooks.ts";
-import { runHooks } from "../../user-config/hooks.ts";
 
 // ---------------------------------------------------------------------------
 // Types

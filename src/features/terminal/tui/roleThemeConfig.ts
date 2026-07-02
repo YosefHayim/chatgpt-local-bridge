@@ -1,4 +1,4 @@
-import type { Message } from "../../domain/types.ts";
+import type { Message } from "@/features/domain";
 
 /** Visual theme applied to a terminal message by role. */
 export type MessageRoleTheme = {

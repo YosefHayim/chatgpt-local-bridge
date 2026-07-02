@@ -1,5 +1,5 @@
+import { extractFileMentions } from "@/features/store";
 import { type MutableRefObject, useMemo, useRef, useState } from "react";
-import { extractFileMentions } from "../../store/fileResolver.ts";
 import { getAllCommands, matchCommands } from "../internal/cliRunner.ts";
 import type { InputMode } from "./appTypes.ts";
 import { PromptHistory } from "./composerHistory.ts";

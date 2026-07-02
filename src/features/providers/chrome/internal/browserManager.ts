@@ -2,10 +2,10 @@ import { execFile, spawn } from "node:child_process";
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
+import type { Conversation } from "@/features/domain";
+import { bridgeDir, chromeProfileDir } from "@/features/store";
 import type { Browser, BrowserContext, Page, Response } from "playwright";
 import { chromium } from "playwright";
-import type { Conversation } from "../../../domain/types.ts";
-import { bridgeDir, chromeProfileDir } from "../../../store/paths.ts";
 import type { BrowserProvider } from "../../browserProviderTypes.ts";
 import { type BridgeProviderId, getBrowserProvider } from "../../providerRegistry.ts";
 

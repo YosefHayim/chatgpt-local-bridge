@@ -1,5 +1,5 @@
+import type { CommandDef } from "@/features/domain";
 import { Box, Text } from "ink";
-import type { CommandDef } from "../../domain/types.ts";
 import {
   CommandFallbackMenu,
   FileMentions,

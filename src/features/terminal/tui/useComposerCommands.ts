@@ -1,5 +1,5 @@
+import type { CommandContext } from "@/features/domain";
 import { useCallback, useMemo } from "react";
-import type { CommandContext } from "../../domain/types.ts";
 import { executeCommand } from "../internal/cliRunner.ts";
 import type { PromptSendResult } from "./appTypes.ts";
 import type { AppProps } from "./appTypes.ts";

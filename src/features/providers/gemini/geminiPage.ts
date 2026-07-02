@@ -1,6 +1,6 @@
 import { PROVIDER_CONFIG } from "@/config";
+import type { ModelOption } from "@/features/domain";
 import type { Locator, Page } from "playwright";
-import type { ModelOption } from "../../domain/types.ts";
 import type { BrowserProvider, ResponseWaitOptions } from "../browserProviderTypes.ts";
 import { GuestSessionError } from "../guestSessionError.ts";
 

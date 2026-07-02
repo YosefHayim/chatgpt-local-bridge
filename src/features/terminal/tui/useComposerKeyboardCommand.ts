@@ -1,4 +1,4 @@
-import type { CommandDef } from "../../domain/types.ts";
+import type { CommandDef } from "@/features/domain";
 import type { ComposerKeyboardOptions } from "./composerKeyboardTypes.ts";
 import { type InputSuggestionGroup, applyInputSuggestion } from "./inputSuggestions.ts";
 import type { ComposerState } from "./useComposerState.ts";

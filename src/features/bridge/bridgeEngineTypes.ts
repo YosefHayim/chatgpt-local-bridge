@@ -1,9 +1,9 @@
-import type { PermissionMode } from "../domain/permissions.ts";
-import type { BridgeConfig, Message } from "../domain/types.ts";
-import type { BrowserManager } from "../providers/chrome/browserManager.ts";
-import type { McpServerHandle, McpToolAction } from "../tools/server.ts";
-import type { CloudflareTunnel } from "../tunnel/cloudflareTunnel.ts";
-import type { LoadedHooksConfig } from "../user-config/hooks.ts";
+import type { PermissionMode } from "@/features/domain";
+import type { BridgeConfig, Message } from "@/features/domain";
+import type { BrowserManager } from "@/features/providers";
+import type { McpServerHandle, McpToolAction } from "@/features/tools";
+import type { CloudflareTunnel } from "@/features/tunnel";
+import type { LoadedHooksConfig } from "@/features/user-config";
 import type { ContextCounter } from "./internal/bridgeEngine.ts";
 import type { Orchestrator } from "./orchestrator.ts";
 

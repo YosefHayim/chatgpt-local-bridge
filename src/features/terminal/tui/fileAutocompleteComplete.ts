@@ -1,5 +1,5 @@
 import { readdir } from "node:fs/promises";
-import { ensureInsideRepo } from "../../tools/server.ts";
+import { ensureInsideRepo } from "@/features/tools";
 import {
   compareCompletionMatches,
   findActiveFileMention,

@@ -3,9 +3,9 @@ import type { Dirent } from "node:fs";
 import { appendFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { hasErrorCode } from "../../domain/errors.ts";
-import type { BridgeProviderId } from "../../providers/providerRegistry.ts";
-import { ensureInsideRepo } from "../../tools/server.ts";
+import { hasErrorCode } from "@/features/domain";
+import type { BridgeProviderId } from "@/features/providers";
+import { ensureInsideRepo } from "@/features/tools";
 
 // ---------------------------------------------------------------------------
 // Types — session

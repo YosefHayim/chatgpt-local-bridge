@@ -1,5 +1,5 @@
-import type { CommandDef } from "../../../domain/types.ts";
-import { loadCustomCommands } from "../../../user-config/hooks.ts";
+import type { CommandDef } from "@/features/domain";
+import { loadCustomCommands } from "@/features/user-config";
 import type {
   InputSuggestion,
   InputSuggestionGroup,

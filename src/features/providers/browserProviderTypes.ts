@@ -1,5 +1,5 @@
+import type { ConnectorSetupOptions, ConnectorSetupResult, ModelOption } from "@/features/domain";
 import type { Page } from "playwright";
-import type { ConnectorSetupOptions, ConnectorSetupResult, ModelOption } from "../domain/types.ts";
 
 // The provider id union (BridgeProviderId) is derived from the registry keys in
 // providerRegistry.ts — the single source of truth. Keep `id` a plain string here to

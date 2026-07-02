@@ -1,5 +1,5 @@
+import { DEFAULT_PROVIDER, PROVIDER_IDS } from "@/features/providers";
 import type { Command } from "commander";
-import { DEFAULT_PROVIDER, PROVIDER_IDS } from "../providers/providerRegistry.ts";
 import { CliRunner, runDownload } from "./internal/cliRunner.ts";
 import { subcommandOpts } from "./subcommandOpts.ts";
 

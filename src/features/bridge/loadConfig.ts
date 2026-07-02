@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { BridgeConfig } from "../domain/types.ts";
-import { configPath } from "../store/paths.ts";
+import type { BridgeConfig } from "@/features/domain";
+import { configPath } from "@/features/store";
 
 const DEFAULT_CONFIG: BridgeConfig = {
   repoPath: process.cwd(),

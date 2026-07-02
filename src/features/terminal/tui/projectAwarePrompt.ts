@@ -1,5 +1,5 @@
-import type { CommandContext } from "../../domain/types.ts";
-import { loadProjectInstructions } from "../../user-config/hooks.ts";
+import type { CommandContext } from "@/features/domain";
+import { loadProjectInstructions } from "@/features/user-config";
 import { buildProjectTaskPromptWithInstructions } from "../internal/cliRunner.ts";
 import { shouldAutoWrapProjectPrompt } from "./roleThemeConfig.ts";
 

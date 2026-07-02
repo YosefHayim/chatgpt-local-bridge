@@ -1,36 +1,30 @@
 import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
-import { render } from "ink";
-import type { Page } from "playwright";
-import React from "react";
-import { startEngine } from "../../bridge/createEngineFactory.ts";
-import type { BridgeEngine } from "../../bridge/createEngineFactory.ts";
-import { type FanoutResult, fanoutAsk, fanoutFailed } from "../../bridge/fanoutOrchestrator.ts";
-import { findModelProfile, listModelProfiles } from "../../domain/modelsConfig.ts";
-import { PERMISSION_MODES, normalizePermissionMode } from "../../domain/permissions.ts";
+import { startEngine } from "@/features/bridge";
+import type { BridgeEngine } from "@/features/bridge";
+import { type FanoutResult, fanoutAsk, fanoutFailed } from "@/features/bridge";
+import { findModelProfile, listModelProfiles } from "@/features/domain";
+import { PERMISSION_MODES, normalizePermissionMode } from "@/features/domain";
 import type {
   Attachment,
   CommandContext,
   CommandDef,
   ConnectorSetupResult,
   Message,
-} from "../../domain/types.ts";
-import { downloadAll, extractAllMessages, loadManifest } from "../../providers/attachments.ts";
-import { BRIDGE_DEBUG_PORT, BrowserManager } from "../../providers/chrome/browserManager.ts";
-import {
-  conversationUrlFromIdOrUrl,
-  isSameChatGptConversation,
-} from "../../providers/conversationUrl.ts";
+} from "@/features/domain";
+import { downloadAll, extractAllMessages, loadManifest } from "@/features/providers";
+import { BRIDGE_DEBUG_PORT, BrowserManager } from "@/features/providers";
+import { conversationUrlFromIdOrUrl, isSameChatGptConversation } from "@/features/providers";
 import {
   type BridgeProviderId,
   getBrowserProvider,
   normalizeProvider,
   parseProviderList,
-} from "../../providers/providerRegistry.ts";
-import { listCheckpoints, restoreCheckpoint } from "../../store/checkpoints.ts";
-import { bridgeLogPath } from "../../store/logging.ts";
-import { exportsDir, screenshotsDir, sessionsDir } from "../../store/paths.ts";
+} from "@/features/providers";
+import { listCheckpoints, restoreCheckpoint } from "@/features/store";
+import { bridgeLogPath } from "@/features/store";
+import { exportsDir, screenshotsDir, sessionsDir } from "@/features/store";
 import {
   type SessionExport,
   type SessionStoreOptions,
@@ -38,14 +32,17 @@ import {
   getLatestSession,
   listSessions,
   loadSession,
-} from "../../store/sessionStore.ts";
-import type { SessionMetadata } from "../../store/sessionStore.ts";
-import { ensureInsideRepo, toolRegistry, trimOutput } from "../../tools/server.ts";
+} from "@/features/store";
+import type { SessionMetadata } from "@/features/store";
+import { ensureInsideRepo, toolRegistry, trimOutput } from "@/features/tools";
 import {
   loadCustomCommands,
   loadProjectInstructions,
   renderCustomCommandPrompt,
-} from "../../user-config/hooks.ts";
+} from "@/features/user-config";
+import { render } from "ink";
+import type { Page } from "playwright";
+import React from "react";
 import type {
   AskOptions,
   CommonCliOptions,

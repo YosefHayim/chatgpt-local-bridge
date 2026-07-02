@@ -1,4 +1,4 @@
-import { PERMISSION_MODES } from "../../../domain/permissions.ts";
+import { PERMISSION_MODES } from "@/features/domain";
 import type { CommandSuggestionRule } from "./types.ts";
 
 /** Suggestion rules keyed by built-in slash command name. */

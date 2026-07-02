@@ -33,3 +33,14 @@ blocks scaling to more providers and is hostile to the agents the CLI targets.
   multi-provider agent CLI trustworthy.
 - Slightly looser typing on `provider.id` (string) is the deliberate price of a
   single-edit registry; call sites compare it to registry keys, which remain exhaustive.
+
+## Update (2026-07-02): the data SSOT moved to `src/config`
+
+The provider *data* (ids, metadata, and core selectors) now lives in
+`config/providersConfig.ts`; `BridgeProviderId` derives from it
+(`keyof typeof PROVIDER_CONFIG`). `providers/providerRegistry.ts` **imports** that table
+and binds behavior — a bespoke `*Page` class for ChatGPT/Gemini, the generic adapter
+otherwise — under a `Record<BridgeProviderId, BrowserProvider>` that makes a missing
+adapter a compile error. The dependency inverts (registry → config, config a pure leaf),
+so there is still exactly one list and still fail-loud `UnknownProviderError`; what
+changed is that *data* now lives in config and *behavior* in the feature. See ADR 0009.

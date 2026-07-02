@@ -43,6 +43,18 @@ _Avoid_: jail, scope.
 **Checkpoint**
 A file snapshot captured around an MCP patch so the change can be rolled back.
 
+**Provider**
+One supported web-chat service (ChatGPT, Gemini, Claude, DeepSeek, Grok, Perplexity).
+Its id, metadata, and core selectors are one entry in `config/providersConfig.ts`;
+`BridgeProviderId` is the set of their ids.
+_Avoid_: model, vendor, bot.
+
+**Door**
+A feature's curated `index.ts` — the only file other features import (as
+`@/features/<name>`). Named re-exports of its public surface, never `export *`; its
+service classes stay in `internal/`.
+_Avoid_: barrel, bare index, entrypoint.
+
 **Target repo**
 The repository the Tools operate inside (`repoPath`, default `process.cwd()`). Also
 where repo-local Bridge state lives, under `.bridge/`.

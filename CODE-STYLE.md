@@ -36,26 +36,43 @@ present. This repo keeps a lint-only `lint` = `biome lint ./` plus its extra
 
 Load-bearing, project-specific rules. Each is a one-liner plus a real before/after.
 
-### Cross-feature access goes through a factory or door — never another feature's `internal/`
+### Cross-feature access goes through the feature's `index.ts` door — never its `internal/`
 
-Within a feature, import its files directly. **Across** features (`src/features/*`),
-import only through that feature's public surface — its `create<Name>Factory.ts` or a
-door module (a re-export file with no own class). A feature's service classes live in
-`internal/` and are private to it. Pure re-export barrels are deleted. Enforced by
-`scripts/dev/checkBoundaries.mjs` (content-based: flags cross-feature imports of any
-module declaring a non-error class).
+Within a feature, import its files directly with a relative path. **Across** features
+(`src/features/*`), import only through that feature's **curated `index.ts` door** — a
+file of **named** re-exports (`export { X } from "./providerRegistry.ts"`), never a
+wildcard `export *`. Cross-feature imports use the **`@/` alias**, not `../../`. A
+feature's service classes live in `internal/` and are private to it. Enforced by
+`scripts/dev/checkBoundaries.mjs` (content-based; resolves `@/` and flags cross-feature
+imports of any module declaring a non-error class).
 
 ```ts
-// before  (src/features/terminal/cliRunner.ts)
-import { BridgeEngine } from "../bridge/internal/bridgeEngine.ts";         // ✗ cross-feature service class
-import { extractAllMessages, loadManifest }
-  from "../providers/chatgpt/chatgptPage.ts";                             // ✗ deep provider import
-// after
-import { startEngine } from "../bridge/createEngineFactory.ts";           // ✓ factory front door
-import { loadManifest } from "../providers/attachments.ts";               // ✓ single-job door
-import { getBrowserProvider } from "../providers/providerRegistry.ts";     // ✓ registry SSOT
+// before  (src/features/terminal/internal/cliRunner.ts)
+import { BridgeEngine } from "../../bridge/internal/bridgeEngine.ts";        // ✗ cross-feature service class
+import { extractAllMessages } from "../../providers/chatgpt/chatgptPage.ts"; // ✗ deep provider import
+// after — every cross-feature import goes through the door via @/
+import { startEngine } from "@/features/bridge";                            // ✓ curated index.ts door
+import { getBrowserProvider, loadManifest } from "@/features/providers";    // ✓ one door, named exports
 ```
-_Why:_ pureness, single jobs, no crossings — each file has one owner and one reason to change.
+_Why:_ one public surface per feature, one owner per file; `internal/` stays private and greppable.
+
+### Static data lives in `src/config` (the SSOT); features hold behavior
+
+Which providers exist, their metadata, and their core DOM selectors live in
+`src/config/providersConfig.ts`; `BridgeProviderId` derives from it (`keyof`). Tunable
+defaults live in `src/config/defaultsConfig.ts`. `src/config` imports nothing from
+`features/*` — it is a leaf the features depend on. The provider registry reads the
+table and binds behavior; a missing adapter is a compile error, never a stale copy.
+
+```ts
+// src/config/providersConfig.ts — data SSOT
+export const PROVIDER_CONFIG = { chatgpt: { /* … */ selectors: { composer, assistant } } /* … */ }
+  satisfies Record<string, ProviderConfigEntry>;
+export type BridgeProviderId = keyof typeof PROVIDER_CONFIG;
+// src/features/providers/providerRegistry.ts — behavior binds the data
+export const PROVIDERS: Record<BridgeProviderId, BrowserProvider> = { /* … */ };
+```
+_Why:_ the old parallel provider list drifted to 2-of-6 and shipped a label bug; one keyed table can't.
 
 ### Big facade classes are legitimate hand-edited source
 
@@ -76,7 +93,7 @@ MCP tool handlers **return** `{ ok, output }` and never throw. Internals **throw
 `Error` subclass only when a caller branches on its type; otherwise `throw new Error(msg)`.
 
 ```ts
-// boundary — src/features/tools/mcpServer.ts (invokeToolHandler)
+// boundary — src/features/tools/internal/mcpServer.ts (invokeToolHandler)
 try { return await handler(args); }
 catch (e) { return { ok: false, output: e.message }; }   // catch-net
 // internal — throw, never a sentinel
@@ -90,7 +107,7 @@ Logging, session-event persistence, config saves, and hook runs never block or
 surface failures.
 
 ```ts
-// src/features/bridge/bridgeEngine.ts
+// src/features/bridge/internal/bridgeEngine.ts
 appendSessionEvent(...).catch(() => {});
 saveConfig(input.config).catch(() => {});
 ```
@@ -155,9 +172,10 @@ export type BridgePermissionMode = "read-only" | "ask" | "auto";  // deleted
 - **Only tool-mandated dots survive:** `*.test.ts` (vitest glob), `tsup.config.ts` /
   `vitest.config.ts` / `biome.json` / `tsconfig.json` (tool contracts). Never invent
   new ones.
-- **A feature's implementation classes live in `internal/`;** its public surface
-  (factory, door, `*Types.ts`, `*Config.ts`) sits at the feature root and re-exports
-  from `internal/`. Cross-feature code imports the public surface, never `internal/`.
+- **A feature's implementation classes live in `internal/`;** its public surface is a
+  curated **`index.ts` door** (named re-exports) at the feature root, alongside
+  `*Types.ts`. Cross-feature code imports the door via the **`@/` alias**
+  (`@/features/<name>`), never `internal/`. Static data belongs in `src/config`, not the feature.
 - Verb prefixes: `is/has/get/build/resolve/load/create/read/capture/parse/normalize/
   find/wait/ensure/format`. Type suffixes: `*Input/*Options/*Result/*Context/*State/*Record`.
 - **Directories stay kebab-case** (`input-suggestions/`, `user-config/`); classes/types
@@ -184,36 +202,38 @@ export type BridgePermissionMode = "read-only" | "ask" | "auto";  // deleted
   redirect `console.log`→stderr, call the shared `startEngine`/`engine.ask` core,
   and end with an explicit `process.exit`. Never prompt in a non-TTY.
 - **TUI slash command:** add to the metadata array + the `executeCommand` registry
-  in `terminal/cliRunner.ts`; both modes must call the same underlying function.
+  in `terminal/internal/cliRunner.ts`; both modes must call the same underlying function.
 - Bare `bridge` opens the TUI in a TTY and defers (never mounts Ink) when non-TTY.
 
 ### Add a feature
-Create `src/features/<name>/`, expose a `create<Name>Factory.ts` (or a door) as its
-only cross-feature entry, put the service class in `<name>/internal/`, keep types in
-`*Types.ts`, static config in `*Config.ts`.
+Create `src/features/<name>/`, put the service class in `<name>/internal/`, and expose a
+curated `<name>/index.ts` door (named re-exports) as its only cross-feature entry —
+reached as `@/features/<name>`. Keep types in `*Types.ts`; static data goes in `src/config`.
 
 ### Add a web-chat provider
-1. **Plain chat (composer + streamed reply)?** Write `<name>ProviderConfig.ts` =
-   `new GenericWebChatPage({...selectors})` — no new class needed.
-   **Complex/bespoke DOM (like ChatGPT)?** Write
-   `providers/<name>/<name>Page.ts` implementing `BrowserProvider` (one class, TSDoc'd
-   public methods) and bind it in the config.
-2. Add **one line** to `providers/providerRegistry.ts` — the id type, `--provider` help,
-   and `bridge login` all derive from it.
+1. Add an entry to `config/providersConfig.ts` — metadata + `selectors` (composer,
+   assistant, optional user/stop/signedOut). `BridgeProviderId`, `--provider` help, and
+   `bridge login` all derive from it.
+2. **Plain chat?** Nothing else — `providerRegistry.ts` builds a `GenericWebChatPage`
+   from the config entry. **Bespoke DOM (like ChatGPT)?** Add
+   `providers/<name>/<name>Page.ts` implementing `BrowserProvider`, read its core
+   selectors from the config entry, and bind it in `providerRegistry.ts`.
 3. A fake-page test under `tests/features/providers/`; then verify selectors against the
    live, signed-in DOM (mark `LIVE-VERIFY` until confirmed).
 
 ## Exemplars
 
 Write new code like these:
+- `src/config/providersConfig.ts` — data SSOT: a keyed table with a derived id type.
+- `src/features/providers/index.ts` — a curated door (named re-exports, no `export *`).
 - `src/features/bridge/internal/orchestrator.ts` — thin facade delegating to module helpers.
 - `src/features/domain/permissions.ts` — pure logic, derived types, guards.
-- `src/features/tools/mcpServer.ts` — the `{ ok, output }` boundary + Sandbox.
-- `src/features/terminal/tui/useComposer.ts` — vertically composed hooks.
+- `src/features/tools/internal/mcpServer.ts` — the `{ ok, output }` boundary + Sandbox.
 
 ## Never
 
-- Add a cross-feature service-class import (reach into another feature's `internal/`), or a pure re-export barrel.
+- Reach into another feature's `internal/`, or add a wildcard `export *` barrel (curated `index.ts` doors only).
+- Keep a second provider list beside `config/providersConfig.ts`, or hardcode a tunable that duplicates `defaultsConfig`.
 - Re-introduce kebab-case files or invented dot-suffixes (`.class`/`.factory`/`.types`/`.config`).
 - Re-add `scripts/merge-*.mjs`, `fix-imports.mjs`, or a file/function-size check.
 - `any`, default exports, or a module-level arrow function.

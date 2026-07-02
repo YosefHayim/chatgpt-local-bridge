@@ -1,3 +1,4 @@
+import { PROVIDER_CONFIG } from "@/config";
 import type { Locator, Page } from "playwright";
 import type { ModelOption } from "../../domain/types.ts";
 import type { BrowserProvider, ResponseWaitOptions } from "../browserProviderTypes.ts";
@@ -342,12 +343,7 @@ const SELECTORS = {
     ".send-button",
     "button.send-button",
   ].join(", "),
-  responseBlock: [
-    "model-response",
-    "message-content",
-    ".model-response-text",
-    ".response-content",
-  ].join(", "),
+  responseBlock: PROVIDER_CONFIG.gemini.selectors.assistant,
   userBlock: ["user-query", ".query-text", ".user-query", '[data-message-author="user"]'].join(
     ", ",
   ),
@@ -573,7 +569,7 @@ export class GeminiPage implements BrowserProvider {
   readonly defaultUrl = "https://gemini.google.com/app";
   readonly defaultModel = "Gemini";
   readonly displayName = "Gemini";
-  readonly composerSelector = 'div.ql-editor, [contenteditable="true"]';
+  readonly composerSelector = PROVIDER_CONFIG.gemini.selectors.composer;
   readonly supportsMcpConnector = false;
 
   /** Fail fast when Gemini is not signed in. */

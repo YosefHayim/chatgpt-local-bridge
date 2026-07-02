@@ -24,8 +24,8 @@ const profile = {
   defaultUrl: "https://demo.test/",
   defaultModel: "Demo",
   displayName: "Demo",
-  composerSelector: "#composer",
-  assistantSelector: ".assistant",
+  supportsMcpConnector: false,
+  selectors: { composer: "#composer", assistant: ".assistant" },
 };
 
 describe("GenericWebChatPage", () => {

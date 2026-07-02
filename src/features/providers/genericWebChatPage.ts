@@ -1,26 +1,10 @@
+import type { ProviderConfigEntry } from "@/config";
 import type { Page } from "playwright";
 import type { ModelOption } from "../domain/types.ts";
 import type { BrowserProvider, ResponseWaitOptions } from "./browserProviderTypes.ts";
 
-/** Selectors + metadata describing a plain web-chat UI (composer + streamed reply). */
-export interface WebChatProfile {
-  id: string;
-  origin: string;
-  defaultUrl: string;
-  defaultModel: string;
-  displayName: string;
-  /** Composer input (contenteditable or textarea). */
-  composerSelector: string;
-  /** Container for a single assistant message; the last match is the latest reply. */
-  assistantSelector: string;
-  /** Container for a single user message (optional; enables full transcript capture). */
-  userSelector?: string;
-  /** Stop-generating button (optional). */
-  stopSelector?: string;
-  /** Element whose presence means "not signed in" (optional). */
-  signedOutSelector?: string;
-  supportsMcpConnector?: boolean;
-}
+/** A provider config entry plus its resolved id — the input to the generic adapter. */
+export type WebChatProfile = ProviderConfigEntry & { id: string };
 
 const MODEL_KEYWORDS = ["gpt", "claude", "gemini", "grok", "deepseek", "sonar", "opus", "sonnet"];
 
@@ -49,15 +33,15 @@ export class GenericWebChatPage implements BrowserProvider {
     this.defaultUrl = profile.defaultUrl;
     this.defaultModel = profile.defaultModel;
     this.displayName = profile.displayName;
-    this.composerSelector = profile.composerSelector;
-    this.supportsMcpConnector = profile.supportsMcpConnector ?? false;
+    this.composerSelector = profile.selectors.composer;
+    this.supportsMcpConnector = profile.supportsMcpConnector;
   }
 
   /** Throw when the composer is absent or a signed-out marker is present. */
   async assertSignedIn(page: Page): Promise<void> {
-    if (this.profile.signedOutSelector) {
+    if (this.profile.selectors.signedOut) {
       const signedOut = await page
-        .locator(this.profile.signedOutSelector)
+        .locator(this.profile.selectors.signedOut)
         .count()
         .catch(() => 0);
       if (signedOut > 0) {
@@ -92,7 +76,7 @@ export class GenericWebChatPage implements BrowserProvider {
     await page
       .waitForFunction(
         (args) => document.querySelectorAll(args.sel).length > args.prev,
-        { sel: this.profile.assistantSelector, prev: before },
+        { sel: this.profile.selectors.assistant, prev: before },
         { timeout },
       )
       .catch(() => undefined);
@@ -113,14 +97,14 @@ export class GenericWebChatPage implements BrowserProvider {
 
   /** Read the text of the latest assistant message. */
   async captureLastResponse(page: Page): Promise<string> {
-    const last = page.locator(this.profile.assistantSelector).last();
+    const last = page.locator(this.profile.selectors.assistant).last();
     return (await last.innerText().catch(() => "")).trim();
   }
 
   /** Count rendered assistant messages. */
   async countAssistantResponses(page: Page): Promise<number> {
     return page
-      .locator(this.profile.assistantSelector)
+      .locator(this.profile.selectors.assistant)
       .count()
       .catch(() => 0);
   }
@@ -128,13 +112,13 @@ export class GenericWebChatPage implements BrowserProvider {
   /** Capture the transcript as role-tagged messages (assistant, plus user when known). */
   async captureAllMessages(page: Page): Promise<Array<{ role: string; content: string }>> {
     const assistant = await page
-      .locator(this.profile.assistantSelector)
+      .locator(this.profile.selectors.assistant)
       .allInnerTexts()
       .catch(() => [] as string[]);
     const messages = assistant.map((content) => ({ role: "assistant", content: content.trim() }));
-    if (!this.profile.userSelector) return messages;
+    if (!this.profile.selectors.user) return messages;
     const user = await page
-      .locator(this.profile.userSelector)
+      .locator(this.profile.selectors.user)
       .allInnerTexts()
       .catch(() => [] as string[]);
     return [...user.map((content) => ({ role: "user", content: content.trim() })), ...messages];
@@ -177,8 +161,8 @@ export class GenericWebChatPage implements BrowserProvider {
 
   /** Click the stop-generating control if the profile defines one. */
   async stopGenerating(page: Page, timeout = 5_000): Promise<boolean> {
-    if (!this.profile.stopSelector) return false;
-    const stop = page.locator(this.profile.stopSelector).first();
+    if (!this.profile.selectors.stop) return false;
+    const stop = page.locator(this.profile.selectors.stop).first();
     const visible = await stop.isVisible({ timeout }).catch(() => false);
     if (!visible) return false;
     await stop.click({ timeout }).catch(() => undefined);

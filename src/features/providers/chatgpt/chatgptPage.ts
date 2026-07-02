@@ -1,5 +1,6 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { PROVIDER_CONFIG } from "@/config";
 import type { APIResponse, Locator, Page } from "playwright";
 import type {
   Attachment,
@@ -4445,14 +4446,14 @@ function parseResponseWaitOptions(options: number | ResponseWaitOptions): {
 /** DOM selectors for ChatGPT's interface. Subject to change if ChatGPT updates UI. */
 const SELECTORS = {
   /** The contenteditable prompt input field. */
-  promptInput: '#prompt-textarea, [contenteditable="true"]',
+  promptInput: PROVIDER_CONFIG.chatgpt.selectors.composer,
   /** The send button (visible when text is entered). */
   sendButton:
     'button[data-testid="send-button"], button[aria-label="Send prompt"], button[aria-label="Send message"]',
   /** Individual assistant response blocks. */
-  responseBlock: '[data-message-author-role="assistant"]',
+  responseBlock: PROVIDER_CONFIG.chatgpt.selectors.assistant,
   /** The most recent response block. */
-  lastResponse: '[data-message-author-role="assistant"]:last-of-type',
+  lastResponse: `${PROVIDER_CONFIG.chatgpt.selectors.assistant}:last-of-type`,
   /** Sidebar conversation links. */
   sidebarConversation: 'nav a[href^="/c/"]',
   /** Streaming indicator (the stop button appears while streaming). */
@@ -4582,7 +4583,7 @@ export class ChatGptPage implements BrowserProvider {
   readonly defaultUrl = "https://chatgpt.com";
   readonly defaultModel = "ChatGPT";
   readonly displayName = "ChatGPT";
-  readonly composerSelector = '#prompt-textarea, [contenteditable="true"]';
+  readonly composerSelector = PROVIDER_CONFIG.chatgpt.selectors.composer;
   readonly supportsMcpConnector = true;
 
   /** Fail fast when ChatGPT is not signed in. */

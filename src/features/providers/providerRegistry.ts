@@ -1,44 +1,34 @@
+import {
+  type BridgeProviderId,
+  DEFAULT_PROVIDER,
+  PROVIDER_ALIASES,
+  PROVIDER_CONFIG,
+  PROVIDER_IDS,
+} from "@/config";
 import type { BrowserProvider } from "./browserProviderTypes.ts";
 import { CHATGPT_PROVIDER } from "./chatgptProviderConfig.ts";
-import { CLAUDE_PROVIDER } from "./claudeProviderConfig.ts";
-import { DEEPSEEK_PROVIDER } from "./deepseekProviderConfig.ts";
 import { GEMINI_PROVIDER } from "./geminiProviderConfig.ts";
-import { GROK_PROVIDER } from "./grokProviderConfig.ts";
-import { PERPLEXITY_PROVIDER } from "./perplexityProviderConfig.ts";
+import { GenericWebChatPage } from "./genericWebChatPage.ts";
 import { UnknownProviderError } from "./unknownProviderError.ts";
 
+/** Build a generic selector-driven adapter from a provider's config entry. */
+function genericProvider(id: BridgeProviderId): BrowserProvider {
+  return new GenericWebChatPage({ id, ...PROVIDER_CONFIG[id] });
+}
+
 /**
- * Single source of truth for supported web-chat providers, keyed by id.
- * Adding a provider is one line here — the id type, the CLI `--provider` help, and
- * `bridge login` all derive from this object.
+ * Browser adapters keyed by id. Metadata + selectors come from `@/config` (the SSOT);
+ * this binds each id to behavior — a bespoke `*Page` class for ChatGPT/Gemini, the
+ * generic adapter otherwise. The `Record<BridgeProviderId, …>` annotation makes a
+ * missing adapter a compile error.
  */
-export const PROVIDERS = {
+export const PROVIDERS: Record<BridgeProviderId, BrowserProvider> = {
   chatgpt: CHATGPT_PROVIDER,
   gemini: GEMINI_PROVIDER,
-  claude: CLAUDE_PROVIDER,
-  deepseek: DEEPSEEK_PROVIDER,
-  grok: GROK_PROVIDER,
-  perplexity: PERPLEXITY_PROVIDER,
-} satisfies Record<string, BrowserProvider>;
-
-/** Supported provider id — derived from the registry keys. */
-export type BridgeProviderId = keyof typeof PROVIDERS;
-
-/** All supported provider ids, in registry order. */
-export const PROVIDER_IDS = Object.keys(PROVIDERS) as BridgeProviderId[];
-
-/** Provider used when a command specifies none. */
-export const DEFAULT_PROVIDER: BridgeProviderId = "chatgpt";
-
-/** Human-typed aliases mapped to canonical ids. */
-const PROVIDER_ALIASES: Record<string, BridgeProviderId> = {
-  gpt: "chatgpt",
-  "chat-gpt": "chatgpt",
-  bard: "gemini",
-  "claude.ai": "claude",
-  anthropic: "claude",
-  x: "grok",
-  ppl: "perplexity",
+  claude: genericProvider("claude"),
+  deepseek: genericProvider("deepseek"),
+  grok: genericProvider("grok"),
+  perplexity: genericProvider("perplexity"),
 };
 
 function unwrapProvider(input: unknown): string | undefined {
@@ -62,7 +52,7 @@ export function normalizeProvider(
   const value = unwrapProvider(input)?.trim().toLowerCase();
   if (!value) return DEFAULT_PROVIDER;
   const resolved = PROVIDER_ALIASES[value] ?? value;
-  if (resolved in PROVIDERS) return resolved as BridgeProviderId;
+  if (resolved in PROVIDER_CONFIG) return resolved as BridgeProviderId;
   throw new UnknownProviderError(value, PROVIDER_IDS);
 }
 
@@ -82,5 +72,7 @@ export function parseProviderList(spec: string | undefined): BridgeProviderId[] 
   return [...new Set(ids)];
 }
 
+export { DEFAULT_PROVIDER, PROVIDER_IDS };
+export type { BridgeProviderId };
 export type { BrowserProvider, ResponseWaitOptions } from "./browserProviderTypes.ts";
 export { UnknownProviderError } from "./unknownProviderError.ts";
